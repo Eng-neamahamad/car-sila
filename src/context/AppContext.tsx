@@ -15,18 +15,7 @@ import {
 } from '../types';
 import { translations } from '../data/translations';
 
-// Initial Empty/Clean Defaults for real fresh accounts
-const DEFAULT_USER: User = {
-  id: 'usr_owner_1',
-  name: 'نعمة',
-  email: 'user@carsila.com',
-  role: 'owner',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  createdAt: new Date().toISOString().split('T')[0],
-  status: 'active',
-  vehiclesCount: 0
-};
-
+// Initial Admin and Generic defaults
 const DEFAULT_ADMIN: User = {
   id: 'usr_admin_1',
   name: 'CAR-SILA Admin',
@@ -45,8 +34,7 @@ const DEFAULT_NOTIFICATIONS: AppNotification[] = [];
 const DEFAULT_ACTIVITIES: ActivityEvent[] = [];
 
 const DEFAULT_USERS_LIST: User[] = [
-  DEFAULT_USER,
-  { id: 'usr_admin_1', name: 'Admin', email: 'admin@carsila.com', role: 'admin', status: 'active', vehiclesCount: 0, createdAt: '2025-01-01' }
+  DEFAULT_ADMIN
 ];
 
 interface Toast {
@@ -141,7 +129,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   // Auth
-  const [currentUser, setCurrentUser] = useState<User | null>(DEFAULT_USER);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('carsila_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [allUsers, setAllUsers] = useState<User[]>(DEFAULT_USERS_LIST);
 
   // Vehicles
@@ -272,18 +267,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, 4000);
   };
 
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('carsila_auth_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('carsila_auth_user');
+    }
+  }, [currentUser]);
+
   // Auth actions
   const login = (email: string, role: 'owner' | 'admin' = 'owner') => {
-    if (role === 'admin' || email.includes('admin')) {
+    if (role === 'admin' || email.toLowerCase().includes('admin')) {
       setCurrentUser(DEFAULT_ADMIN);
       setCurrentView('admin-overview');
       showToast(language === 'ar' ? 'تم تسجيل الدخول كمسؤول للنظام' : 'Logged in as CAR-SILA Administrator', 'info');
     } else {
-      const user: User = {
-        ...DEFAULT_USER,
-        email: email || DEFAULT_USER.email
+      const existingUser = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+      const user: User = existingUser || {
+        id: 'usr_' + Date.now(),
+        name: email.split('@')[0] || (language === 'ar' ? 'مالك المركبة' : 'Car Owner'),
+        email: email,
+        role: 'owner',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString().split('T')[0],
+        status: 'active',
+        vehiclesCount: 0
       };
       setCurrentUser(user);
+      if (!existingUser) {
+        setAllUsers((prev) => [user, ...prev]);
+      }
       setCurrentView('dashboard');
       showToast(language === 'ar' ? `مرحباً بعودتك، ${user.name}` : `Welcome back, ${user.name}!`, 'success');
     }
@@ -292,7 +305,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const register = (name: string, email: string) => {
     const newUser: User = {
       id: 'usr_' + Date.now(),
-      name: name || 'Ahmed Al-Masri',
+      name: name || (language === 'ar' ? 'مالك المركبة' : 'Car Owner'),
       email: email || 'user@carsila.com',
       role: 'owner',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
@@ -303,7 +316,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentUser(newUser);
     setAllUsers((prev) => [newUser, ...prev]);
     setCurrentView('dashboard');
-    showToast(language === 'ar' ? 'تم إنشاء الحساب بنجاح! مرحباً بك' : 'Account created successfully! Welcome to CAR-SILA', 'success');
+    showToast(language === 'ar' ? `تم إنشاء الحساب بنجاح! مرحباً بك ${newUser.name}` : `Account created successfully! Welcome ${newUser.name}`, 'success');
   };
 
   const logout = () => {
@@ -327,8 +340,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newVeh: Vehicle = {
       ...data,
       id: 'veh_' + Date.now(),
-      ownerId: currentUser?.id || 'usr_ahmed_1',
-      ownerName: currentUser?.name || 'Ahmed Al-Masri',
+      ownerId: currentUser?.id || 'usr_' + Date.now(),
+      ownerName: currentUser?.name || (language === 'ar' ? 'مالك المركبة' : 'Vehicle Owner'),
       qrToken: token,
       scansCount: 0,
       reportsCount: 0,

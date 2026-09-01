@@ -37,11 +37,12 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fadeIn text-start">
+      {/* Top Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             {language === 'ar' 
-              ? `مرحباً بك، ${currentUser?.name || 'نعمة'}! 👋` 
+              ? `مرحباً بك، ${currentUser?.name || 'صديقنا'}! 👋` 
               : `Welcome back, ${currentUser?.name || 'User'}! 👋`}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
@@ -60,7 +61,9 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* 4 STATS CARDS (Dynamic Numbers: 0 on fresh accounts) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {/* Card 1: Vehicles */}
         <div 
           onClick={() => setCurrentView('my-vehicles')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer"
@@ -77,6 +80,7 @@ export const DashboardView: React.FC = () => {
           <p className="text-[11px] text-slate-500">{t('totalVehicles')}</p>
         </div>
 
+        {/* Card 2: Reports */}
         <div 
           onClick={() => setCurrentView('reports')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-rose-300 transition-all cursor-pointer"
@@ -99,6 +103,7 @@ export const DashboardView: React.FC = () => {
           <p className="text-[11px] text-slate-500">{t('newReports')}</p>
         </div>
 
+        {/* Card 3: Alerts */}
         <div 
           onClick={() => setCurrentView('notifications')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-amber-300 transition-all cursor-pointer"
@@ -115,6 +120,7 @@ export const DashboardView: React.FC = () => {
           <p className="text-[11px] text-slate-500">{t('unreadAlerts')}</p>
         </div>
 
+        {/* Card 4: Resolved */}
         <div 
           onClick={() => setCurrentView('reports')}
           className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer"
@@ -132,7 +138,10 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* TWO COLUMN LOWER SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Left Column: Recent Activity */}
         <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-6">
@@ -150,6 +159,7 @@ export const DashboardView: React.FC = () => {
               )}
             </div>
 
+            {/* Activity List or Clean Empty State */}
             {activities.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
@@ -231,15 +241,18 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
+        {/* Right Column: Reports Overview Doughnut Chart */}
         <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 mb-6">
               {t('reportsOverview')}
             </h3>
 
+            {/* Custom SVG Doughnut Chart */}
             <div className="flex flex-col items-center justify-center my-4">
               <div className="relative w-44 h-44 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Background Track */}
                   <circle
                     cx="50"
                     cy="50"
@@ -293,6 +306,7 @@ export const DashboardView: React.FC = () => {
                   )}
                 </svg>
 
+                {/* Center text: Total Reports */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span className="text-2xl font-black text-slate-900 tracking-tight">
                     {totalReports}
@@ -303,6 +317,7 @@ export const DashboardView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Chart Legend */}
               <div className="flex items-center justify-center gap-6 mt-6 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>

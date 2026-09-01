@@ -893,7 +893,9 @@ export const LandingPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-[11px] text-slate-400 font-medium">{language === 'ar' ? 'الهاتف / واتساب' : 'Phone & WhatsApp'}</p>
-                      <p className="font-bold select-all">+962 7 9000 0000</p>
+                      <a href="https://wa.me/970597112357" target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-500 hover:underline select-all">
+                        +970597112357
+                      </a>
                     </div>
                   </div>
 
@@ -903,7 +905,7 @@ export const LandingPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-[11px] text-slate-400 font-medium">{language === 'ar' ? 'الموقع' : 'Location'}</p>
-                      <p className="font-bold">{language === 'ar' ? 'عمان، الأردن — الشرق الأوسط' : 'Amman, Jordan — Middle East'}</p>
+                      <p className="font-bold">{language === 'ar' ? 'غزة، فلسطين' : 'Gaza, Palestine'}</p>
                     </div>
                   </div>
                 </div>

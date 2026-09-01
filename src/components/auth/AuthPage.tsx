@@ -10,11 +10,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
   const { currentView, setCurrentView, login, register, t, language, theme, showToast } = useApp();
   const isRegister = currentView === 'register' || initialMode === 'register';
 
-  const [name, setName] = useState(isRegister ? '' : 'نعمة حمد');
-  const [email, setEmail] = useState(isRegister ? '' : 'neamahamad2003@gmail.com');
-  const [phone, setPhone] = useState('+972597113222');
-  const [password, setPassword] = useState('password123');
-  const [confirmPassword, setConfirmPassword] = useState('password123');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(true);
 
@@ -33,26 +33,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
         showToast(language === 'ar' ? 'يرجى إدخال البريد الإلكتروني' : 'Please enter email', 'warning');
         return;
       }
+      if (!password.trim()) {
+        showToast(language === 'ar' ? 'يرجى إدخال كلمة المرور' : 'Please enter password', 'warning');
+        return;
+      }
+      if (password !== confirmPassword) {
+        showToast(language === 'ar' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match', 'warning');
+        return;
+      }
       register(name.trim(), email.trim());
     } else {
       if (!email.trim()) {
         showToast(language === 'ar' ? 'يرجى إدخال البريد الإلكتروني' : 'Please enter email', 'warning');
         return;
       }
+      if (!password.trim()) {
+        showToast(language === 'ar' ? 'يرجى إدخال كلمة المرور' : 'Please enter password', 'warning');
+        return;
+      }
       login(email.trim(), email.toLowerCase().includes('admin') ? 'admin' : 'owner');
     }
-  };
-
-  const handleFillDemoOwner = () => {
-    setEmail('neamahamad2003@gmail.com');
-    setPassword('password123');
-    setName('نعمة حمد');
-  };
-
-  const handleFillDemoAdmin = () => {
-    setEmail('admin@carsila.com');
-    setPassword('adminPass123');
-    setName('CAR-SILA Administrator');
   };
 
   return (
@@ -85,27 +85,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
               </p>
             </div>
 
-            {/* Quick Demo Fillers */}
-            <div className={`flex flex-wrap items-center gap-2 mb-6 p-2.5 rounded-2xl border text-xs ${
-              theme === 'dark' ? 'bg-slate-800/80 border-slate-700' : 'bg-blue-50/80 border-blue-100'
-            }`}>
-              <span className="font-bold text-blue-500">{language === 'ar' ? 'تعبئة سريعة:' : 'Quick Fill:'}</span>
-              <button
-                type="button"
-                onClick={handleFillDemoOwner}
-                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors cursor-pointer"
-              >
-                {language === 'ar' ? 'المالكة (نعمة حمد)' : 'Owner (Neama)'}
-              </button>
-              <button
-                type="button"
-                onClick={handleFillDemoAdmin}
-                className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors cursor-pointer"
-              >
-                {language === 'ar' ? 'المشرف (Admin)' : 'Admin'}
-              </button>
-            </div>
-
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Full Name (if register) */}
@@ -125,7 +104,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder={language === 'ar' ? 'مثال: نعمة حمد' : 'e.g. Neama Hamad'}
+                      placeholder={language === 'ar' ? 'أدخل اسمك الكامل' : 'Enter your full name'}
                       className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                         theme === 'dark' 
                           ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
@@ -152,7 +131,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+972597113222"
+                      placeholder={language === 'ar' ? 'مثال: 059XXXXXXXX' : '+970 59 XXX XXXX'}
                       className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                         theme === 'dark' 
                           ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
@@ -179,7 +158,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="neamahamad2003@gmail.com"
+                    placeholder={language === 'ar' ? 'user@example.com' : 'name@example.com'}
                     className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                       theme === 'dark' 
                         ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
@@ -306,7 +285,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
             {/* Google OAuth button */}
             <button
               type="button"
-              onClick={() => login('neamahamad2003@gmail.com', 'owner')}
+              onClick={() => {
+                const userEmail = email.trim() || 'user@gmail.com';
+                const userName = name.trim() || (language === 'ar' ? 'مستخدم جديد' : 'New User');
+                register(userName, userEmail);
+              }}
               className={`w-full py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
                 theme === 'dark'
                   ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-750'
