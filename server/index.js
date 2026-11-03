@@ -56,14 +56,23 @@ app.disable('x-powered-by');
 const allowedOrigins = new Set(['http://localhost:5173', 'http://127.0.0.1:5173']);
 if (process.env.APP_URL && process.env.APP_URL !== 'MY_APP_URL') allowedOrigins.add(process.env.APP_URL);
 
+const originAllowed = (origin) => {
+  if (!origin || allowedOrigins.has(origin)) return true;
+  try {
+    const host = new URL(origin).hostname;
+    return host === 'localhost' || host.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+};
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) callback(null, true);
-    else callback(null, false);
+    callback(null, originAllowed(origin));
   },
   credentials: true
 }));
@@ -385,6 +394,10 @@ app.post('/api/notifications/read', async (req, res) => {
 });
 
 const port = Number(process.env.PORT) || 8787;
-app.listen(port, '127.0.0.1', () => {
-  console.log(`CAR-SILA API listening on http://127.0.0.1:${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, '127.0.0.1', () => {
+    console.log(`CAR-SILA API listening on http://127.0.0.1:${port}`);
+  });
+}
+
+export default app;
