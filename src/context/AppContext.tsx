@@ -137,7 +137,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [currentView, setViewState] = useState<AppView>(() => readSavedView(null));
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('carsila_language');
-    return saved === 'ar' || saved === 'en' ? saved : 'en';
+    return saved === 'ar' || saved === 'en' ? saved : 'ar';
   });
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('carsila_theme');
