@@ -14,7 +14,7 @@ export const AdminOverviewView: React.FC = () => {
           <ShieldCheck className="w-4 h-4" />
           <span>بوابة الإشراف والرقابة المركزية</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black">لوحة المراقبة العامة للمنصة</h1>
+        <h1 className="text-xl font-black sm:text-3xl">لوحة المراقبة العامة للمنصة</h1>
         <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
           متابعة النشاط الكلي، المركبات المضافة، وسرعة الاستجابة للبلاغات والملصقات في الوقت الفعلي.
         </p>

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { QRStickerCard } from './QRStickerCard';
+import logo from '../../assets/logo.png';
 import {
   X,
   Printer,
@@ -102,20 +103,20 @@ export const PrintQRModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 relative max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#0a2430] rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-cyan-500/20 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={() => setPrintModalVehicle(null)}
-          className="absolute top-5 right-5 rtl:right-auto rtl:left-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors no-print cursor-pointer"
+          className="absolute top-5 right-5 rtl:right-auto rtl:left-5 p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors no-print cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="mb-5 no-print text-start">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-300 text-xs font-bold mb-2">
             <Printer className="w-3.5 h-3.5" />
             {language === 'ar' ? 'خيارات الطباعة والتصدير' : 'Print & Export Sticker'}
           </div>
-          <h3 className="text-xl font-black text-slate-900">
+          <h3 className="text-xl font-black text-white">
             {language === 'ar' ? 'ملصق السيارة الذكي' : 'Smart Vehicle QR Sticker'}
           </h3>
           <p className="text-xs text-slate-500 mt-1">
@@ -130,16 +131,7 @@ export const PrintQRModal: React.FC = () => {
           className="p-6 border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 flex flex-col items-center justify-center print:border-solid print:border-black print:bg-white my-4"
         >
           <div className="w-full max-w-xs bg-white p-6 rounded-2xl border-2 border-slate-300 shadow-md text-center space-y-3">
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-sm shadow-blue-600/30">
-                CS
-              </div>
-              <span className="font-black text-slate-900 tracking-tight text-lg">CAR-SILA</span>
-            </div>
-
-            <p className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest bg-blue-50 py-1 rounded-md">
-              SMART VEHICLE IDENTITY
-            </p>
+            <img src={logo} alt="CAR-SILA" className="h-14 w-auto object-contain mx-auto" />
 
             <div className="py-1 px-3 bg-slate-100 rounded-lg inline-block text-xs font-mono font-bold text-slate-900 border border-slate-200">
               {printModalVehicle.brand} {printModalVehicle.model} • {printModalVehicle.plateNumber}
@@ -179,7 +171,7 @@ export const PrintQRModal: React.FC = () => {
 
             <button
               onClick={handleCopyImage}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md shadow-slate-900/20 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#041820] hover:bg-[#063040] text-white text-xs font-bold border border-cyan-500/20 shadow-md shadow-cyan-900/20 transition-all cursor-pointer"
             >
               {copiedImage ? (
                 <>
@@ -188,7 +180,7 @@ export const PrintQRModal: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 text-blue-400" />
+                  <Copy className="w-4 h-4 text-cyan-300" />
                   <span>{language === 'ar' ? 'نسخ كصورة' : 'Copy Image'}</span>
                 </>
               )}
@@ -196,7 +188,7 @@ export const PrintQRModal: React.FC = () => {
 
             <button
               onClick={handlePrint}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-bold shadow-md shadow-cyan-600/30 transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>{language === 'ar' ? 'طباعة عبر المتصفح' : 'Print Now'}</span>
@@ -206,7 +198,7 @@ export const PrintQRModal: React.FC = () => {
           <div className="flex justify-end pt-2">
             <button
               onClick={() => setPrintModalVehicle(null)}
-              className="px-5 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              className="px-5 py-2 rounded-xl border border-cyan-500/30 text-slate-200 font-semibold text-xs hover:bg-white/5 transition-colors cursor-pointer"
             >
               {language === 'ar' ? 'إغلاق' : 'Close'}
             </button>

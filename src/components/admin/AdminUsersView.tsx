@@ -31,7 +31,7 @@ export const AdminUsersView: React.FC = () => {
       {/* Header (Screen 18 top) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
             {t('adminUsers')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
@@ -106,7 +106,7 @@ export const AdminUsersView: React.FC = () => {
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                       u.role === 'admin'
                         ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                        : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
                     }`}>
                       {u.role.toUpperCase()}
                     </span>

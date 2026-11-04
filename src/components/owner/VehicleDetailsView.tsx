@@ -33,7 +33,7 @@ export const VehicleDetailsView: React.FC = () => {
         <p className="text-slate-500 font-bold">{language === 'ar' ? 'لم يتم العثور على المركبة' : 'Vehicle not found'}</p>
         <button
           onClick={() => setCurrentView('my-vehicles')}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs"
+          className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white font-bold text-xs"
         >
           {language === 'ar' ? 'الرجوع إلى مركباتي' : 'Back to My Vehicles'}
         </button>
@@ -51,7 +51,7 @@ export const VehicleDetailsView: React.FC = () => {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setCurrentView('my-vehicles')}
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-cyan-300 cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
           <span>{language === 'ar' ? 'الرجوع إلى مركباتي' : 'Back to My Vehicles'}</span>
@@ -65,7 +65,7 @@ export const VehicleDetailsView: React.FC = () => {
             <select
               value={vehicle.status}
               onChange={(e) => updateVehicleStatus(vehicle.id, e.target.value as any)}
-              className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-none"
+              className="text-xs font-bold bg-[#041820] border border-cyan-500/20 rounded-lg px-2.5 py-1 text-white focus:outline-none"
             >
               <option value="active">{language === 'ar' ? 'نشط' : 'Active'}</option>
               <option value="dnd">{language === 'ar' ? 'عدم الإزعاج' : 'Do Not Disturb'}</option>
@@ -75,7 +75,7 @@ export const VehicleDetailsView: React.FC = () => {
 
           <button
             onClick={() => setConfirmDeleteOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-xs font-bold transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>{language === 'ar' ? 'حذف المركبة' : 'Delete'}</span>
@@ -85,12 +85,12 @@ export const VehicleDetailsView: React.FC = () => {
 
       {confirmDeleteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center space-y-4">
-            <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto">
+          <div className="bg-[#0a2430] rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-cyan-500/20 text-center space-y-4">
+            <div className="w-14 h-14 bg-rose-500/15 text-rose-300 rounded-2xl flex items-center justify-center mx-auto">
               <Trash2 className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900">
+              <h3 className="text-lg font-extrabold text-white">
                 {language === 'ar' ? 'تأكيد حذف المركبة' : 'Delete Vehicle?'}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
@@ -103,7 +103,7 @@ export const VehicleDetailsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setConfirmDeleteOpen(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl border border-cyan-500/20 text-slate-300 text-xs font-bold hover:bg-white/5 cursor-pointer"
               >
                 {language === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
@@ -121,13 +121,13 @@ export const VehicleDetailsView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 space-y-6">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
+          <div className="bg-[#0a2430] rounded-3xl p-6 sm:p-7 border border-cyan-500/20 shadow-sm space-y-6">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-300 bg-cyan-500/15 px-2.5 py-1 rounded-md">
                   {vehicle.brand}
                 </span>
-                <h2 className="text-2xl font-black text-slate-900 mt-2">
+                <h2 className="mt-2 text-xl font-black text-white sm:text-2xl">
                   {vehicle.brand} {vehicle.model}
                 </h2>
                 <p className="text-xs text-slate-500 font-medium">
@@ -135,35 +135,35 @@ export const VehicleDetailsView: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-3 bg-slate-900 text-white rounded-2xl">
-                <Car className="w-6 h-6 text-blue-400" />
+              <div className="p-3 bg-cyan-500/15 text-white rounded-2xl">
+                <Car className="w-6 h-6 text-cyan-300" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="p-3.5 bg-[#041820] rounded-2xl border border-cyan-500/10">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                   {language === 'ar' ? 'رقم اللوحة' : 'Plate Number'}
                 </span>
-                <span className="text-sm font-mono font-black text-slate-900 mt-1 block">
+                <span className="text-sm font-mono font-black text-white mt-1 block">
                   {vehicle.plateNumber}
                 </span>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="p-3.5 bg-[#041820] rounded-2xl border border-cyan-500/10">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                   {language === 'ar' ? 'إجمالي المسحات' : 'Total Scans'}
                 </span>
-                <span className="text-sm font-extrabold text-blue-600 mt-1 block">
+                <span className="text-sm font-extrabold text-cyan-300 mt-1 block">
                   {vehicle.scansCount}
                 </span>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 col-span-2 sm:col-span-1">
+              <div className="p-3.5 bg-[#041820] rounded-2xl border border-cyan-500/10 col-span-2 sm:col-span-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                   {language === 'ar' ? 'البلاغات' : 'Reports'}
                 </span>
-                <span className="text-sm font-extrabold text-amber-600 mt-1 block">
+                <span className="text-sm font-extrabold text-amber-300 mt-1 block">
                   {vehicle.reportsCount}
                 </span>
               </div>
@@ -171,12 +171,12 @@ export const VehicleDetailsView: React.FC = () => {
 
             <div className="pt-2">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
                   {language === 'ar' ? 'ملصق QR الذكي' : 'Smart QR Sticker'}
                 </h4>
                 <button
                   onClick={() => regenerateQRToken(vehicle.id)}
-                  className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-blue-600 cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-cyan-300 cursor-pointer"
                 >
                   <RefreshCw className="w-3 h-3" />
                   <span>{language === 'ar' ? 'تجديد الرمز' : 'Regenerate'}</span>
@@ -188,7 +188,7 @@ export const VehicleDetailsView: React.FC = () => {
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={() => setPrintModalVehicle(vehicle)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-bold shadow-md shadow-cyan-600/30 transition-all cursor-pointer"
                 >
                   <Printer className="w-4 h-4" />
                   <span>{language === 'ar' ? 'طباعة الملصق' : 'Print Sticker'}</span>
@@ -199,9 +199,9 @@ export const VehicleDetailsView: React.FC = () => {
         </div>
 
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <div className="bg-[#0a2430] rounded-3xl p-6 border border-cyan-500/20 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-extrabold text-slate-900">
+              <h3 className="text-sm font-extrabold text-white">
                 {language === 'ar' ? 'سجل النشاط للمركبة' : 'Vehicle Activity Log'}
               </h3>
               <Clock className="w-4 h-4 text-slate-400" />
@@ -214,10 +214,10 @@ export const VehicleDetailsView: React.FC = () => {
                 .map((act) => (
                   <div
                     key={act.id}
-                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start justify-between gap-3"
+                    className="p-3.5 rounded-2xl bg-[#041820] border border-cyan-500/10 flex items-start justify-between gap-3"
                   >
                     <div className="space-y-0.5">
-                      <p className="text-xs font-bold text-slate-900">{act.title}</p>
+                      <p className="text-xs font-bold text-white">{act.title}</p>
                       <p className="text-[11px] text-slate-500">{act.subtitle}</p>
                     </div>
                     <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">

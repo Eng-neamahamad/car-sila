@@ -1,226 +1,515 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BrowserQRCodeReader } from '@zxing/browser';
 import { useApp } from '../../context/AppContext';
-import { ReportIssueType } from '../../types';
-import { 
-  Shield, 
-  Send, 
-  CheckCircle2, 
-  Car, 
-  AlertTriangle, 
-  Lightbulb, 
-  Lock, 
-  Sparkles, 
-  MapPin, 
-  MessageSquare,
-  ArrowRight
+import { ReportCategory, VehicleStatus } from '../../types';
+import {
+  Car,
+  Lightbulb,
+  TriangleAlert,
+  Package,
+  Lock,
+  Send,
+  CheckCircle2,
+  ChevronRight,
+  Globe,
+  ArrowLeft,
+  Camera,
+  CameraOff,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import logo from '../../assets/logo.png';
+
+type Step = 'code' | 'welcome' | 'reasons' | 'details' | 'success';
+
+const compact = (value: string) => value.trim().toLowerCase().replace(/[\s\-_.]/g, '');
+
+const codeFromScan = (raw: string) => {
+  const text = raw.trim();
+  const embedded = text.match(/scan=([^&#\s]+)/);
+  if (embedded) {
+    try {
+      return decodeURIComponent(embedded[1]);
+    } catch {
+      return embedded[1];
+    }
+  }
+  return text;
+};
 
 export const QRScanFlow: React.FC = () => {
-  const { vehicles, addReport, setCurrentView, activeScanVehicle } = useApp();
-  const targetVehicle = activeScanVehicle || vehicles[0];
+  const {
+    activeScanVehicle,
+    setActiveScanVehicle,
+    findVehicleByCode,
+    submitVisitorReport,
+    setCurrentView,
+    conversations,
+    activeConversationId,
+    sendMessage,
+    language,
+    setLanguage,
+    currentUser,
+    t,
+  } = useApp();
 
-  const [step, setStep] = useState<'options' | 'success'>('options');
-  const [selectedIssue, setSelectedIssue] = useState<ReportIssueType>('blocking');
-  const [customText, setCustomText] = useState<string>('');
-  const [reporterPhone, setReporterPhone] = useState<string>('');
-  const [isAnonymous, setIsAnonymous] = useState<boolean>(true);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [step, setStep] = useState<Step>(activeScanVehicle ? 'welcome' : 'code');
+  const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState<'required' | 'notFound' | ''>('');
+  const [scanning, setScanning] = useState(false);
+  const [looking, setLooking] = useState(false);
+  const [cameraError, setCameraError] = useState<'blocked' | 'missing' | ''>('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const lookupRef = useRef<(raw: string) => void>(() => undefined);
+  const [category, setCategory] = useState<ReportCategory>('blocking');
+  const [note, setNote] = useState('');
+  const [chatText, setChatText] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const issuePresets = [
-    { type: 'blocking' as ReportIssueType, label: 'إغلاق موقف أو ممر', icon: '🚗', desc: 'السيارة تغلق مدخل كراج أو موقف خاص' },
-    { type: 'lights_on' as ReportIssueType, label: 'الأنوار مضاءة', icon: '💡', desc: 'أضواء السيارة الأمامية أو الداخلية مضاءة' },
-    { type: 'open_window' as ReportIssueType, label: 'النافذة مفتوحة', icon: '🪟', desc: 'إحدى النوافذ مفتوحة جزئياً أو كلياً' },
-    { type: 'flat_tire' as ReportIssueType, label: 'إطار مفرغ من الهواء', icon: '🛞', desc: 'بنشر أو تسريب هواء في أحد الإطارات' },
-    { type: 'accident' as ReportIssueType, label: 'صدمة أو احتكاك بسيط', icon: '⚠️', desc: 'احتكاك بسيط أثناء الركن' },
-    { type: 'emergency' as ReportIssueType, label: 'حالة طوارئ قصوى', icon: '🚨', desc: 'حاجة ماسة لتحريك السيارة فوراً' },
-    { type: 'other' as ReportIssueType, label: 'ملاحظة أخرى', icon: '📝', desc: 'رسالة خاصة لمالك المركبة' },
-  ];
-
-  const handleSendReport = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetVehicle) return;
-
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      addReport({
-        vehicleId: targetVehicle.id,
-        vehiclePlate: targetVehicle.plateNumber,
-        vehicleName: `${targetVehicle.brand} ${targetVehicle.model}`,
-        issueType: selectedIssue,
-        customMessage: customText || issuePresets.find(p => p.type === selectedIssue)?.label,
-        reporterContact: isAnonymous ? undefined : reporterPhone,
-        isAnonymous,
-        locationName: 'موقع السيارة الممسوحة',
-      });
-
-      setIsSubmitting(false);
-      setStep('success');
-
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch (err) {
-        console.log(err);
-      }
-    }, 400);
+  const leave = () => {
+    setActiveScanVehicle(null);
+    if (window.location.hash.includes('scan=')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+    if (currentUser?.role === 'owner') setCurrentView('dashboard');
+    else if (currentUser?.role === 'admin') setCurrentView('admin-overview');
+    else setCurrentView('landing');
   };
 
-  if (!targetVehicle) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 text-center max-w-md">
-          <Car className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <h3 className="font-extrabold text-slate-900 dark:text-white">لم يتم العثور على مركبة</h3>
-          <p className="text-xs text-slate-500 mt-1">الرجاء مسح ملصق QR صالح لمركبة مسجلة.</p>
-          <button
-            onClick={() => setCurrentView('landing')}
-            className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold"
-          >
-            العودة للرئيسية
-          </button>
-        </div>
-      </div>
+  const plate = activeScanVehicle?.plateNumber || '';
+  const conversation = conversations.find((item) => item.id === activeConversationId);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (step !== 'success') return;
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation?.messages.length, step]);
+
+  const reasons: {
+    category: ReportCategory;
+    title: string;
+    hint: string;
+    icon: React.ReactNode;
+    tone: string;
+    image: string;
+    iconClass: string;
+    borderClass: string;
+  }[] = [
+    {
+      category: 'blocking',
+      title: t('visitorBlocking'),
+      hint: t('visitorBlockingHint'),
+      icon: <Car className="h-5 w-5" />,
+      tone: 'border-cyan-400/40 text-cyan-300 bg-cyan-500/10',
+      image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=900&q=70',
+      iconClass: 'bg-cyan-500 text-white',
+      borderClass: 'border-cyan-400/60 shadow-cyan-500/10',
+    },
+    {
+      category: 'lights',
+      title: t('visitorLights'),
+      hint: t('visitorLightsHint'),
+      icon: <Lightbulb className="h-5 w-5" />,
+      tone: 'border-amber-400/40 text-amber-300 bg-amber-500/10',
+      image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=70',
+      iconClass: 'bg-amber-500 text-white',
+      borderClass: 'border-amber-400/60 shadow-amber-500/10',
+    },
+    {
+      category: 'accident',
+      title: t('visitorAccident'),
+      hint: t('visitorAccidentHint'),
+      icon: <TriangleAlert className="h-5 w-5" />,
+      tone: 'border-rose-400/40 text-rose-300 bg-rose-500/10',
+      image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=70',
+      iconClass: 'bg-rose-500 text-white',
+      borderClass: 'border-rose-400/60 shadow-rose-500/10',
+    },
+    {
+      category: 'other',
+      title: t('visitorOther'),
+      hint: t('visitorOtherHint'),
+      icon: <Package className="h-5 w-5" />,
+      tone: 'border-sky-400/40 text-sky-300 bg-sky-500/10',
+      image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=70',
+      iconClass: 'bg-sky-500 text-white',
+      borderClass: 'border-sky-400/60 shadow-sky-500/10',
+    },
+  ];
+
+  const selected = reasons.find((item) => item.category === category) || reasons[0];
+
+  const statusLabel = (status: VehicleStatus) => {
+    if (status === 'dnd') return t('visitorStatusDnd');
+    if (status === 'maintenance') return t('visitorStatusMaintenance');
+    if (status === 'inactive') return t('visitorStatusInactive');
+    return t('active');
+  };
+
+  const lookup = async (raw: string) => {
+    const value = codeFromScan(raw);
+    if (!compact(value)) {
+      setCodeError('required');
+      return;
+    }
+    setLooking(true);
+    setCodeError('');
+    const found = await findVehicleByCode(value);
+    setLooking(false);
+    if (!found) {
+      setCodeError('notFound');
+      return;
+    }
+    setCode('');
+    setScanning(false);
+    setActiveScanVehicle(found);
+    setStep('welcome');
+  };
+
+  lookupRef.current = (raw: string) => {
+    void lookup(raw);
+  };
+
+  useEffect(() => {
+    if (!scanning) return;
+    const video = videoRef.current;
+    if (!video) return;
+    let active = true;
+    const reader = new BrowserQRCodeReader();
+    const controlsPromise = reader.decodeFromConstraints(
+      { video: { facingMode: { ideal: 'environment' } } },
+      video,
+      (result) => {
+        if (!active || !result) return;
+        active = false;
+        const text = result.getText();
+        void controlsPromise.then((controls) => controls.stop()).catch(() => undefined);
+        setScanning(false);
+        lookupRef.current(text);
+      }
     );
-  }
+    controlsPromise.catch((error: unknown) => {
+      if (!active) return;
+      active = false;
+      setScanning(false);
+      const name = error instanceof DOMException ? error.name : '';
+      setCameraError(name === 'NotAllowedError' || name === 'SecurityError' ? 'blocked' : 'missing');
+    });
+    return () => {
+      active = false;
+      void controlsPromise.then((controls) => controls.stop()).catch(() => undefined);
+    };
+  }, [scanning]);
+
+  const findCar = () => {
+    void lookup(code);
+  };
+
+  const sendReport = async () => {
+    if (sending || !activeScanVehicle) return;
+    setSending(true);
+    const report = await submitVisitorReport({
+      category,
+      title: selected.title,
+      description: note.trim() || selected.title,
+      hasLocation: false,
+    });
+    setSending(false);
+    if (report.id) setStep('success');
+  };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 py-8 px-4 flex items-center justify-center">
-      <div className="max-w-lg w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
-        
-        {/* Header Card */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 p-6 text-white text-center relative">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-xs font-bold mb-2">
-            <Shield className="w-3.5 h-3.5" />
-            <span>تواصل محمي ومشفر عبر CAR-SILA</span>
-          </div>
-          <h2 className="text-xl font-black">{targetVehicle.brand} {targetVehicle.model} ({targetVehicle.year})</h2>
-          
-          <div className="inline-block mt-2 px-4 py-1.5 rounded-xl bg-slate-950/80 text-white font-mono text-sm font-bold tracking-wider border border-white/10 shadow-inner">
-            {targetVehicle.plateNumber}
+    <div className="fixed inset-0 z-30 overflow-y-auto bg-[#041018] text-slate-100">
+      <div className={`mx-auto flex min-h-full w-full flex-col px-3 py-4 sm:px-4 sm:py-6 ${step === 'reasons' ? 'max-w-6xl justify-start' : 'max-w-md justify-center'}`}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={leave} className="flex items-center gap-2 cursor-pointer">
+            <img src={logo} alt="CAR-SILA" className="h-7 w-auto shrink-0 object-contain sm:h-8" />
+            <span className="text-base font-black tracking-tight sm:text-lg">CAR-SILA</span>
+          </button>
+          <button
+            type="button"
+            onClick={leave}
+            className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-[#38BDF8] hover:text-white"
+          >
+            <ArrowLeft className={`h-3.5 w-3.5 ${language === 'ar' ? 'rotate-180' : ''}`} />
+            {currentUser?.role === 'owner' ? t('dashboard') : currentUser?.role === 'admin' ? t('adminPanel') : t('home')}
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-bold text-slate-200"
+            >
+              <Globe className="h-3.5 w-3.5 text-[#38BDF8]" />
+              {language === 'ar' ? 'English' : 'العربية'}
+            </button>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#10B981]/30 bg-[#10B981]/10 px-2.5 py-1 text-[11px] font-bold text-[#10B981]">
+              <Lock className="w-3.5 h-3.5" />
+              {t('visitorSecure')}
+            </span>
           </div>
         </div>
 
-        {/* Form Body */}
-        <div className="p-6">
-          {step === 'options' && (
-            <form onSubmit={handleSendReport} className="space-y-6">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  <span>حدد نوع البلاغ لإخطار المالك فوراً:</span>
-                </h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {issuePresets.map(preset => (
-                    <button
-                      key={preset.type}
-                      type="button"
-                      onClick={() => setSelectedIssue(preset.type)}
-                      className={`p-3 rounded-2xl text-right text-xs font-bold border transition-all flex items-start gap-2.5 cursor-pointer ${
-                        selectedIssue === preset.type
-                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20'
-                          : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-xl shrink-0 mt-0.5">{preset.icon}</span>
-                      <div>
-                        <div className="font-extrabold">{preset.label}</div>
-                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">{preset.desc}</div>
-                      </div>
-                    </button>
-                  ))}
+        {step === 'code' && (
+          <section className="rounded-3xl border border-white/10 bg-[#101626] p-4 sm:p-6">
+            <h1 className="text-lg font-black leading-relaxed">{t('visitorScanTitle')}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">{t('visitorScanHint')}</p>
+            {scanning ? (
+              <div className="mt-5 space-y-3">
+                <div className="relative overflow-hidden rounded-2xl border border-[#38BDF8]/40 bg-black">
+                  <video ref={videoRef} className="aspect-square w-full object-cover" muted autoPlay playsInline />
+                  <div className="pointer-events-none absolute inset-6 rounded-2xl border-2 border-[#38BDF8]" />
                 </div>
+                <p className="text-center text-xs font-bold text-[#38BDF8]">{t('visitorScanning')}</p>
+                <button
+                  type="button"
+                  onClick={() => setScanning(false)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 py-3 text-sm font-bold text-slate-200"
+                >
+                  <CameraOff className="h-4 w-4" />
+                  {t('visitorStopScan')}
+                </button>
               </div>
-
-              {/* Custom message */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  رسالة توضيحية إضافية (اختياري):
-                </label>
-                <textarea
-                  rows={3}
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  placeholder="مثال: لو سمحت سيارتك مقفلة عليّ، أنا مستعجل وبانتظارك..."
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:border-emerald-500 dark:text-white resize-none"
-                />
-              </div>
-
-              {/* Privacy Shield Toggle */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3">
-                <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isAnonymous}
-                    onChange={(e) => setIsAnonymous(e.target.checked)}
-                    className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                  />
-                  <span>إرسال البلاغ بهوية مجهولة (تشفير رقمك وبياناتك)</span>
-                </label>
-
-                {!isAnonymous && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                      رقم هاتفك للتواصل المباشر في حال رغبتك:
-                    </label>
-                    <input
-                      type="tel"
-                      value={reporterPhone}
-                      onChange={(e) => setReporterPhone(e.target.value)}
-                      placeholder="+966 5x xxx xxxx"
-                      className="w-full p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs dark:text-white"
-                    />
-                  </div>
-                )}
-              </div>
-
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setCameraError('');
+                  setCodeError('');
+                  setScanning(true);
+                }}
+                disabled={looking}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#38BDF8] py-3.5 text-sm font-black text-[#0A0E1A] disabled:opacity-60"
+              >
+                <Camera className="h-4 w-4" />
+                {t('visitorOpenCamera')}
+              </button>
+            )}
+            {cameraError && (
+              <p className="mt-3 text-xs font-bold text-[#EF4444]">
+                {cameraError === 'blocked' ? t('visitorCameraBlocked') : t('visitorNoCamera')}
+              </p>
+            )}
+            <form
+              className="mt-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                findCar();
+              }}
+            >
+              <p className="mb-2 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">{t('visitorOrType')}</p>
+              <input
+                value={code}
+                onChange={(event) => {
+                  setCode(event.target.value);
+                  setCodeError('');
+                }}
+                placeholder={t('visitorCodePlaceholder')}
+                className="w-full rounded-2xl border border-white/10 bg-[#0A0E1A] px-4 py-3 text-sm outline-none focus:border-[#38BDF8]"
+              />
+              {codeError && (
+                <p className="mt-2 text-xs font-bold text-[#EF4444]">
+                  {codeError === 'required' ? t('visitorCodeRequired') : t('visitorCodeNotFound')}
+                </p>
+              )}
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm shadow-xl shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                disabled={looking}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#38BDF8]/40 py-3.5 text-sm font-black text-[#38BDF8] disabled:opacity-60"
               >
-                <Send className="w-4 h-4" />
-                <span>{isSubmitting ? 'جاري الإرسال الفوري...' : 'إرسال التنبيه الفوري لمالك السيارة'}</span>
+                {t('visitorFindCar')}
+                <ChevronRight className={`h-4 w-4 ${language === 'ar' ? 'rotate-180' : ''}`} />
               </button>
             </form>
-          )}
+          </section>
+        )}
 
-          {step === 'success' && (
-            <div className="text-center py-6 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center shadow-inner">
-                <CheckCircle2 className="w-10 h-10" />
+        {step === 'welcome' && activeScanVehicle && (
+          <section className="rounded-3xl border border-white/10 bg-[#101626] p-4 text-center sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#38BDF8]">{t('visitorCarDetails')}</p>
+            <h2 className="mt-2 text-lg font-black sm:text-xl">
+              {activeScanVehicle.brand} {activeScanVehicle.model}
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {activeScanVehicle.year} • {activeScanVehicle.color}
+            </p>
+            <div className="mx-auto mt-5 inline-flex max-w-full items-center gap-2 rounded-2xl border border-white/10 bg-[#0A0E1A] px-4 py-2.5 font-mono text-base font-bold tracking-widest sm:px-5 sm:py-3 sm:text-lg">
+              {plate}
+              <CheckCircle2 className="w-5 h-5 text-[#10B981]" />
+            </div>
+            <p className="mt-3 text-xs font-bold text-slate-300">
+              {t('status')}: {statusLabel(activeScanVehicle.status)}
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-slate-300">
+              {activeScanVehicle.status === 'inactive'
+                ? t('visitorInactive')
+                : t('visitorWelcome').replace('{plate}', plate)}
+            </p>
+            {activeScanVehicle.status !== 'inactive' && (
+              <button
+                type="button"
+                onClick={() => setStep('reasons')}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#38BDF8] py-3.5 text-sm font-black text-[#0A0E1A]"
+              >
+                {t('visitorContinue')}
+                <ChevronRight className={`h-4 w-4 ${language === 'ar' ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+          </section>
+        )}
+
+        {step === 'reasons' && activeScanVehicle && (
+          <section className="space-y-4 sm:space-y-8">
+            <div className="grid items-center gap-3 sm:gap-6 lg:grid-cols-[1.15fr_1fr_auto]">
+              <div className="relative h-32 overflow-hidden rounded-2xl border border-cyan-400/25 sm:h-52 sm:rounded-[2rem]">
+                <img
+                  src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80"
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#041018] via-[#041018]/35 to-cyan-500/20" />
               </div>
-              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                تم إرسال التنبيه لصاحب السيارة بنجاح!
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-                وصل إشعار فوري لهاتف مالك السيارة. سيتمكن المالك من قراءة البلاغ والرد عليك مباشرة في غضون لحظات.
-              </p>
-
-              <div className="pt-4 flex flex-col gap-2">
-                <button
-                  onClick={() => setCurrentView('dashboard')}
-                  className="w-full py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs cursor-pointer hover:opacity-90 transition-all flex items-center justify-center gap-1.5"
-                >
-                  <span>الانتقال للوحة تحكم المالك لمشاهدة وصول البلاغ</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => { setStep('options'); setCustomText(''); }}
-                  className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                >
-                  إرسال بلاغ آخر
-                </button>
+              <div className="text-start">
+                <h1 className="text-xl font-black tracking-tight sm:text-3xl">
+                  {t('visitorHello').replace('{name}', currentUser?.name || (language === 'ar' ? 'زائر' : 'Visitor'))} <span aria-hidden="true">👋</span>
+                </h1>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-300 sm:mt-3 sm:text-sm">{t('visitorReasonLead')}</p>
+                <p className="mt-1 text-xs font-bold text-cyan-300 sm:mt-2 sm:text-sm">
+                  {activeScanVehicle.brand} {activeScanVehicle.model} • {plate}
+                </p>
+              </div>
+              <div className="flex items-center gap-2.5 rounded-2xl border border-cyan-500/20 bg-[#0a2430] px-3 py-2 sm:gap-3 sm:rounded-3xl sm:px-4 sm:py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500 text-xs font-black text-[#041018] sm:h-12 sm:w-12 sm:text-sm">
+                  {(currentUser?.name || 'ز').slice(0, 2)}
+                </div>
+                <div className="min-w-0 text-start">
+                  <p className="truncate text-xs font-black sm:text-sm">{currentUser?.name || (language === 'ar' ? 'زائر' : 'Visitor')}</p>
+                  {currentUser?.email && <p className="truncate text-[10px] text-slate-400 sm:text-[11px]">{currentUser.email}</p>}
+                  {currentUser && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-emerald-300 sm:mt-1 sm:text-[11px]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      {t('visitorOnline')}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
+            <h2 className="text-center text-lg font-black sm:text-2xl">{t('visitorChooseReason')}</h2>
+            <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2">
+              {reasons.map((item) => (
+                <button
+                  key={item.category}
+                  type="button"
+                  onClick={() => {
+                    setCategory(item.category);
+                    setStep('details');
+                  }}
+                  className={`relative overflow-hidden rounded-2xl border-2 bg-[#071820] text-start shadow-lg sm:min-h-32 sm:rounded-3xl ${item.borderClass}`}
+                >
+                  <img src={item.image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
+                  <div className="absolute inset-0 bg-gradient-to-l from-[#041018] via-[#041018]/85 to-[#041018]/35" />
+                  <div className="relative flex items-center gap-3 p-3 sm:gap-4 sm:p-5">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${item.iconClass}`}>
+                      {item.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold leading-snug text-white sm:text-base sm:font-black">{item.title}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-slate-300 sm:mt-1 sm:text-xs">{item.hint}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-200 sm:h-5 sm:w-5 rtl:rotate-180" />
+                  </div>
+                </button>
+              ))}
+            </div>
+            <p className="pt-2 text-center text-[11px] italic tracking-wide text-cyan-200/70 sm:pt-4 sm:text-xs">Together for a safer road</p>
+          </section>
+        )}
+
+        {step === 'details' && (
+          <section className="rounded-3xl border border-white/10 bg-[#101626] p-5">
+            <div className={`mb-4 inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-bold ${selected.tone}`}>
+              {selected.icon}
+              <span className="text-white">{selected.title}</span>
+            </div>
+            <label className="mb-2 block text-sm font-bold" htmlFor="visitor-note">
+              {t('visitorOptionalNote')}
+            </label>
+            <textarea
+              id="visitor-note"
+              rows={4}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder={t('visitorNotePlaceholder')}
+              className="w-full resize-none rounded-2xl border border-white/10 bg-[#0A0E1A] p-3 text-sm outline-none focus:border-[#38BDF8]"
+            />
+            <button
+              type="button"
+              onClick={sendReport}
+              disabled={sending}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#38BDF8] py-3.5 text-sm font-black text-[#0A0E1A] disabled:opacity-60"
+            >
+              <Send className="h-4 w-4" />
+              {t('visitorSendNow')}
+            </button>
+          </section>
+        )}
+
+        {step === 'success' && (
+          <section className="space-y-4">
+            <div className="rounded-3xl border border-[#10B981]/30 bg-[#10B981]/10 p-4 text-center sm:p-6">
+              <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-[#10B981]" />
+              <h2 className="text-lg font-black text-[#10B981]">{t('visitorSent')}</h2>
+              <p className="mt-2 text-sm text-slate-200">
+                {t('visitorSentAbout').replace('{car}', `${activeScanVehicle?.brand || ''} ${plate}`.trim())}
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-[#101626] p-4">
+              <p className="mb-3 text-xs font-bold text-slate-400">{t('visitorChatHint')}</p>
+              <div className="mb-3 max-h-48 space-y-2 overflow-y-auto">
+                {(conversation?.messages || []).map((message) => (
+                  <div
+                    key={message.id}
+                    className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${
+                      message.senderRole === 'reporter'
+                        ? 'me-auto bg-[#38BDF8]/15 text-[#38BDF8]'
+                        : 'ms-auto bg-white/10 text-white'
+                    }`}
+                  >
+                    {message.text}
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <form
+                className="flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!conversation || !chatText.trim()) return;
+                  sendMessage(conversation.id, chatText, 'reporter');
+                  setChatText('');
+                }}
+              >
+                <input
+                  value={chatText}
+                  onChange={(event) => setChatText(event.target.value)}
+                  placeholder={t('visitorChatPlaceholder')}
+                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#0A0E1A] px-3 py-2 text-sm outline-none focus:border-[#38BDF8]"
+                />
+                <button type="submit" className="rounded-xl bg-[#38BDF8] px-3 py-2 text-[#0A0E1A]" aria-label={t('visitorSendMessage')}>
+                  <Send className="h-4 w-4" />
+                </button>
+              </form>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentView('landing')}
+              className="w-full rounded-2xl border border-white/10 py-3 text-sm font-bold text-slate-300"
+            >
+              {t('visitorEndSession')}
+            </button>
+          </section>
+        )}
       </div>
     </div>
   );

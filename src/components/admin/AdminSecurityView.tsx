@@ -28,7 +28,7 @@ export const AdminSecurityView: React.FC = () => {
       {/* Header (Screen 21 top) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
             {t('adminSecurity')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
@@ -54,7 +54,7 @@ export const AdminSecurityView: React.FC = () => {
           </div>
           <h3 className="text-2xl font-black text-white">100% Enforced</h3>
           <p className="text-xs text-slate-400">
-            Direct phone numbers are never stored in plain text or rendered on public DOM.
+            Visitor responses never include the owner's phone, email, or full name.
           </p>
         </div>
 
@@ -72,11 +72,11 @@ export const AdminSecurityView: React.FC = () => {
         <div className="bg-slate-800/80 p-6 rounded-3xl border border-slate-700 shadow-lg space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Spam Shield</span>
-            <Server className="w-5 h-5 text-blue-400" />
+            <Server className="w-5 h-5 text-cyan-300" />
           </div>
           <h3 className="text-2xl font-black text-white">Rate-Limited</h3>
           <p className="text-xs text-slate-400">
-            Max 3 reports per IP/hour per car to prevent spamming vehicle owners.
+            One report per IP for the same car each minute. Extra attempts are refused.
           </p>
         </div>
       </div>

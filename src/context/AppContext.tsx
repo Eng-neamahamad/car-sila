@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
   AppView,
   Language,
@@ -10,37 +10,28 @@ import {
   AppNotification,
   ActivityEvent,
   Conversation,
-  ChatMessage,
   ReportStatus
 } from '../types';
+import { api, ApiError, toVisitorVehicle, Workspace } from '../data/api';
 import { translations } from '../data/translations';
-
-// Initial Admin and Generic defaults
-const DEFAULT_ADMIN: User = {
-  id: 'usr_admin_1',
-  name: 'CAR-SILA Admin',
-  email: 'admin@carsila.com',
-  role: 'admin',
-  avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
-  createdAt: '2025-01-01',
-  status: 'active',
-  vehiclesCount: 0
-};
-
-const DEFAULT_VEHICLES: Vehicle[] = [];
-const DEFAULT_REPORTS: Report[] = [];
-const DEFAULT_CONVERSATIONS: Conversation[] = [];
-const DEFAULT_NOTIFICATIONS: AppNotification[] = [];
-const DEFAULT_ACTIVITIES: ActivityEvent[] = [];
-
-const DEFAULT_USERS_LIST: User[] = [
-  DEFAULT_ADMIN
-];
+import {
+  ADMIN_EMAIL,
+  StoredAccount,
+  isAdminView,
+  isOwnerView,
+  readSavedView,
+  VIEW_KEY
+} from '../data/storage';
 
 interface Toast {
   id: string;
   message: string;
   type: 'success' | 'info' | 'warning' | 'error';
+}
+
+interface Ping {
+  id: string;
+  message: string;
 }
 
 interface AppContextType {
@@ -57,17 +48,26 @@ interface AppContextType {
   // Auth / Users
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
-  login: (email: string, role?: 'owner' | 'admin') => void;
-  register: (name: string, email: string) => void;
+  login: (email: string, password: string) => void;
+  loginWithGoogle: (credential: string) => void;
+  register: (name: string, email: string, password: string, phone?: string) => void;
+  updateProfile: (name: string, email: string) => void;
   logout: () => void;
   allUsers: User[];
+  users: User[];
+  adminStats: {
+    totalUsers: number;
+    totalVehicles: number;
+    totalScans: number;
+    resolvedReportsRate: number;
+  };
   toggleUserStatus: (userId: string) => void;
 
   // Vehicles
   vehicles: Vehicle[];
   selectedVehicleId: string | null;
   setSelectedVehicleId: (id: string | null) => void;
-  addVehicle: (vehicle: Omit<Vehicle, 'id' | 'qrToken' | 'scansCount' | 'reportsCount' | 'createdAt' | 'ownerId' | 'ownerName'>) => Vehicle;
+  addVehicle: (vehicle: Omit<Vehicle, 'id' | 'qrToken' | 'scansCount' | 'reportsCount' | 'createdAt' | 'ownerId' | 'ownerName'>) => Promise<boolean>;
   deleteVehicle: (id: string) => void;
   clearAllVehicles: () => void;
   updateVehicleStatus: (id: string, status: Vehicle['status']) => void;
@@ -76,13 +76,14 @@ interface AppContextType {
   // Visitor QR Scan flow
   activeScanVehicle: Vehicle | null;
   setActiveScanVehicle: (v: Vehicle | null) => void;
+  findVehicleByCode: (code: string) => Promise<Vehicle | null>;
   submitVisitorReport: (data: {
     category: ReportCategory;
     title: string;
     description: string;
     hasLocation: boolean;
     locationName?: string;
-  }) => Report;
+  }) => Promise<Report>;
   lastSubmittedReport: Report | null;
 
   // Reports
@@ -96,6 +97,7 @@ interface AppContextType {
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
   sendMessage: (conversationId: string, text: string, senderRole: 'owner' | 'reporter') => void;
+  markMessagesRead: (conversationId: string) => void;
 
   // Notifications & Activity
   notifications: AppNotification[];
@@ -107,6 +109,7 @@ interface AppContextType {
   // Toasts
   toasts: Toast[];
   showToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  pings: Ping[];
 
   // Modals
   qrModalVehicle: Vehicle | null;
@@ -119,44 +122,57 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const emptyReport = (data: { category: ReportCategory; title: string; description: string }): Report => ({
+  id: '',
+  vehicleId: '',
+  vehicleName: '',
+  vehiclePlate: '',
+  category: data.category,
+  title: data.title,
+  description: data.description,
+  hasLocation: false,
+  status: 'new',
+  reporterName: 'Anonymous',
+  reporterSessionId: '',
+  createdAt: '',
+  timestamp: ''
+});
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Navigation
-  const [currentView, setCurrentView] = useState<AppView>('landing');
-  const [language, setLanguageState] = useState<Language>('en');
+  const [currentView, setViewState] = useState<AppView>(() => readSavedView(null));
+  const [language, setLanguageState] = useState<Language>(() => {
+    const saved = localStorage.getItem('carsila_language');
+    return saved === 'ar' || saved === 'en' ? saved : 'ar';
+  });
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('carsila_theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'dark';
   });
 
   // Auth
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem('carsila_auth_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [allUsers, setAllUsers] = useState<User[]>(DEFAULT_USERS_LIST);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const knownEmails = useRef(new Set<string>());
 
   // Vehicles
-  const [vehicles, setVehicles] = useState<Vehicle[]>(DEFAULT_VEHICLES);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>('veh_toyota_1');
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
 
   // Reports
-  const [reports, setReports] = useState<Report[]>(DEFAULT_REPORTS);
+  const [reports, setReports] = useState<Report[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   // Conversations
-  const [conversations, setConversations] = useState<Conversation[]>(DEFAULT_CONVERSATIONS);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>('conv_1');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   // Notifications & Activity
-  const [notifications, setNotifications] = useState<AppNotification[]>(DEFAULT_NOTIFICATIONS);
-  const [activities, setActivities] = useState<ActivityEvent[]>(DEFAULT_ACTIVITIES);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [activities, setActivities] = useState<ActivityEvent[]>([]);
 
   // Visitor Flow
-  const [activeScanVehicle, setActiveScanVehicle] = useState<Vehicle | null>(DEFAULT_VEHICLES[0]);
+  const [activeScanVehicle, setActiveScanVehicle] = useState<Vehicle | null>(null);
   const [lastSubmittedReport, setLastSubmittedReport] = useState<Report | null>(null);
 
   // Modals
@@ -166,10 +182,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [pings, setPings] = useState<Ping[]>([]);
+  const heardRef = useRef<{ notices: Set<string>; messages: Set<string> } | null>(null);
+  const audioRef = useRef<AudioContext | null>(null);
+  const languageRef = useRef(language);
+  languageRef.current = language;
 
   // Update HTML dir and lang on language change
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
+    localStorage.setItem('carsila_language', lang);
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   };
@@ -214,46 +236,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [language]);
 
   useEffect(() => {
-    // Check if URL contains scan parameter (e.g. #scan=SILA-TOY-22123 or ?scan=SILA-TOY-22123)
     const handleUrlScan = () => {
       const hash = window.location.hash;
       const search = window.location.search;
       let token = '';
 
       if (hash.includes('scan=')) {
-        token = hash.split('scan=')[1]?.split('&')[0];
+        token = decodeURIComponent(hash.split('scan=')[1]?.split('&')[0] || '');
       } else if (search.includes('scan=')) {
-        const params = new URLSearchParams(search);
-        token = params.get('scan') || '';
+        token = new URLSearchParams(search).get('scan') || '';
       }
 
-      if (token) {
-        const found = vehicles.find((v) => v?.qrToken && v.qrToken.toLowerCase() === token.toLowerCase()) || vehicles[0] || {
-          id: 'veh_scanned_' + token,
-          ownerId: 'usr_owner_scanned',
-          ownerName: 'CAR-SILA Member',
-          brand: 'Vehicle',
-          model: 'Registered',
-          year: 2024,
-          color: 'Standard',
-          plateNumber: token.replace('SILA-', ''),
-          qrToken: token,
-          status: 'active',
-          scansCount: 1,
-          reportsCount: 0,
-          createdAt: new Date().toISOString()
-        };
-        if (found) {
-          setActiveScanVehicle(found);
-          setCurrentView('qr-scan-flow');
-        }
-      }
+      if (!token) return;
+      api<{ vehicle: Parameters<typeof toVisitorVehicle>[0] }>(`/api/public/vehicle?code=${encodeURIComponent(token)}`)
+        .then((data) => {
+          setActiveScanVehicle(toVisitorVehicle(data.vehicle));
+          setViewState('qr-scan-flow');
+        })
+        .catch(() => undefined);
     };
 
     handleUrlScan();
     window.addEventListener('hashchange', handleUrlScan);
     return () => window.removeEventListener('hashchange', handleUrlScan);
-  }, [vehicles]);
+  }, []);
 
   const t = (key: string): string => {
     return translations[language]?.[key] || translations.en[key] || key;
@@ -267,408 +273,487 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, 4000);
   };
 
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('carsila_auth_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('carsila_auth_user');
-    }
-  }, [currentUser]);
+  const playTick = () => {
+    const ctx = audioRef.current;
+    if (!ctx) return;
+    ctx.resume().then(() => {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1480, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.06, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    }).catch(() => undefined);
+  };
 
-  // Auth actions
-  const login = (email: string, role: 'owner' | 'admin' = 'owner') => {
-    if (role === 'admin' || email.toLowerCase().includes('admin')) {
-      setCurrentUser(DEFAULT_ADMIN);
-      setCurrentView('admin-overview');
-      showToast(language === 'ar' ? 'تم تسجيل الدخول كمسؤول للنظام' : 'Logged in as CAR-SILA Administrator', 'info');
-    } else {
-      const existingUser = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-      const user: User = existingUser || {
-        id: 'usr_' + Date.now(),
-        name: email.split('@')[0] || (language === 'ar' ? 'مالك المركبة' : 'Car Owner'),
-        email: email,
-        role: 'owner',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString().split('T')[0],
-        status: 'active',
-        vehiclesCount: 0
-      };
-      setCurrentUser(user);
-      if (!existingUser) {
-        setAllUsers((prev) => [user, ...prev]);
+  const showPing = (message: string) => {
+    const id = `ping_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setPings((prev) => [...prev.slice(-1), { id, message }]);
+    playTick();
+    window.setTimeout(() => {
+      setPings((prev) => prev.filter((item) => item.id !== id));
+    }, 2800);
+  };
+
+  const noticeArrivals = (data: Workspace) => {
+    const stripMail = (value: string) => value
+      .replace(/\s*\([^)]*@[^)]*\)/g, '')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const incomingIds: string[] = [];
+    const incomingText = new Map<string, string>();
+    for (const conversation of data.conversations) {
+      for (const message of conversation.messages) {
+        const incoming = conversation.side === 'reporter'
+          ? message.senderRole === 'owner'
+          : message.senderRole === 'reporter';
+        if (!incoming) continue;
+        incomingIds.push(message.id);
+        incomingText.set(message.id, message.text);
       }
-      setCurrentView('dashboard');
-      showToast(language === 'ar' ? `مرحباً بعودتك، ${user.name}` : `Welcome back, ${user.name}!`, 'success');
+    }
+    const noticeIds = data.notifications.map((item) => item.id);
+    if (!heardRef.current) {
+      heardRef.current = { notices: new Set(noticeIds), messages: new Set(incomingIds) };
+      return;
+    }
+    const freshNotices = data.notifications.filter((item) => !heardRef.current?.notices.has(item.id) && !item.isRead);
+    const freshMessages = incomingIds.filter((id) => !heardRef.current?.messages.has(id));
+    heardRef.current = { notices: new Set(noticeIds), messages: new Set(incomingIds) };
+    const arabic = languageRef.current === 'ar';
+    if (freshNotices.length) {
+      const item = freshNotices[freshNotices.length - 1];
+      const title = item.type === 'chat_message'
+        ? (arabic ? 'رسالة جديدة' : 'New message')
+        : (arabic ? 'بلاغ جديد' : 'New report');
+      const detail = stripMail(item.message || '').slice(0, 80);
+      showPing(detail ? `${title}: ${detail}` : title);
+      return;
+    }
+    if (freshMessages.length) {
+      const detail = stripMail(incomingText.get(freshMessages[freshMessages.length - 1]) || '').slice(0, 80);
+      showPing(detail
+        ? (arabic ? `رسالة جديدة: ${detail}` : `New message: ${detail}`)
+        : (arabic ? 'رسالة جديدة' : 'New message'));
     }
   };
 
-  const register = (name: string, email: string) => {
-    const newUser: User = {
-      id: 'usr_' + Date.now(),
-      name: name || (language === 'ar' ? 'مالك المركبة' : 'Car Owner'),
-      email: email || 'user@carsila.com',
-      role: 'owner',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString().split('T')[0],
-      status: 'active',
-      vehiclesCount: 0
+  const applyWorkspace = (data: Workspace) => {
+    noticeArrivals(data);
+    setCurrentUser(data.user);
+    setVehicles(data.vehicles);
+    setReports(data.reports);
+    setConversations(data.conversations);
+    setNotifications(data.notifications);
+    setActivities(data.activities);
+    setAccounts(data.users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      password: '',
+      role: user.role === 'admin' ? 'admin' : 'owner',
+      status: user.status,
+      createdAt: user.createdAt,
+      avatar: user.avatar
+    })));
+    setViewState((view) => {
+      if (!data.user && (isOwnerView(view) || isAdminView(view))) return 'landing';
+      return view;
+    });
+  };
+
+  const explain = (error: unknown) => {
+    const code = error instanceof ApiError ? error.code : 'request_failed';
+    const messages: Record<string, [string, string]> = {
+      invalid_credentials: ['البريد أو كلمة المرور غير صحيحة', 'Email or password is incorrect'],
+      suspended: ['هذا الحساب موقوف ولا يمكنه الدخول', 'This account is suspended'],
+      reserved_email: ['هذا البريد مخصص لإدارة المنصة', 'This email is reserved for the administrator'],
+      email_taken: ['هذا البريد مسجّل من قبل', 'This email is already registered'],
+      rate_limited: ['يمكنك إرسال بلاغ واحد لنفس السيارة كل دقيقة', 'You can send one report for this car each minute'],
+      not_found: ['لا توجد سيارة مسجّلة بهذا الرمز', 'No registered car matches this code'],
+      forbidden: ['هذه الصلاحية غير متاحة لهذا الحساب', 'This account cannot do that'],
+      invalid_input: ['البيانات المدخلة غير صالحة', 'The entered details are not valid'],
+      invalid_email: ['البريد لازم يكون فيه @ مثل name@gmail.com', 'The email needs an @ sign, like name@gmail.com'],
+      short_password: ['كلمة المرور لازم تكون 6 أحرف على الأقل', 'The password must be at least 6 characters'],
+      google_failed: ['تعذر التحقق من حساب Google', 'Google could not be verified'],
+      admin_google: ['حساب المسؤول يدخل من البريد وكلمة المرور فقط', 'The administrator signs in with email and password only'],
+      plate_taken: ['رقم اللوحة مسجّل من قبل', 'This plate is already registered'],
+      invalid_plate: ['رقم اللوحة لازم يكون من 3 إلى 15 حرفاً أو رقماً، بدون رموز مثل ! @ #', 'The plate must be 3 to 15 letters or numbers, without symbols such as ! @ #'],
+      invalid_brand: ['اختَر ماركة من القائمة، أو اكتب الماركة في خيار أخرى', 'Choose a brand from the list, or type one under Other'],
+      vehicle_limit: ['كل حساب يقدر يسجّل 10 سيارات كحد أقصى', 'Each account can register up to 10 vehicles']
     };
-    setCurrentUser(newUser);
-    setAllUsers((prev) => [newUser, ...prev]);
-    setCurrentView('dashboard');
-    showToast(language === 'ar' ? `تم إنشاء الحساب بنجاح! مرحباً بك ${newUser.name}` : `Account created successfully! Welcome ${newUser.name}`, 'success');
+    const pair = messages[code] || ['تعذر حفظ العملية', 'The action could not be saved'];
+    showToast(language === 'ar' ? pair[0] : pair[1], 'error');
+  };
+
+  useEffect(() => {
+    const unlock = () => {
+      const Context = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Context) return;
+      if (!audioRef.current) audioRef.current = new Context();
+      audioRef.current.resume().catch(() => undefined);
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.removeItem('carsila_db');
+    localStorage.removeItem('carsila_session');
+    localStorage.removeItem('carsila_auth_user');
+    let stopped = false;
+    const load = () => {
+      api<Workspace>('/api/bootstrap')
+        .then((data) => {
+          if (!stopped) applyWorkspace(data);
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const liveChat = currentView === 'messages' || currentView === 'qr-scan-flow';
+    const timer = window.setInterval(load, liveChat ? 4000 : 6000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [currentView]);
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_KEY, currentView);
+  }, [currentView]);
+
+  useEffect(() => {
+    knownEmails.current = new Set(accounts.map((account) => account.email.toLowerCase()));
+  }, [accounts]);
+
+  const setCurrentView = (view: AppView) => {
+    const role = currentUser?.role;
+    if (isAdminView(view) && role !== 'admin') {
+      showToast(
+        language === 'ar' ? 'لوحة الإدارة متاحة للمسؤول فقط' : 'The admin panel is only available to the administrator',
+        'error'
+      );
+      setViewState(role === 'owner' ? 'dashboard' : 'login');
+      return;
+    }
+    if (isOwnerView(view) && role !== 'owner') {
+      showToast(
+        language === 'ar' ? 'هذه الصفحة لصاحب المركبة فقط' : 'This page is only available to a vehicle owner',
+        'error'
+      );
+      setViewState(role === 'admin' ? 'admin-overview' : 'login');
+      return;
+    }
+    setViewState(view);
+  };
+
+  const openSession = (data: Workspace) => {
+    applyWorkspace(data);
+    setViewState(data.user?.role === 'admin' ? 'admin-overview' : 'dashboard');
+    const name = data.user?.name || '';
+    showToast(
+      data.user?.role === 'admin'
+        ? (language === 'ar' ? 'تم تسجيل الدخول كمسؤول للنظام' : 'Logged in as CAR-SILA Administrator')
+        : (language === 'ar' ? `مرحباً بعودتك، ${name}` : `Welcome back, ${name}!`),
+      'success'
+    );
+  };
+
+  const login = (email: string, password: string) => {
+    api<Workspace>('/api/auth/login', { email, password })
+      .then(openSession)
+      .catch(explain);
+  };
+
+  const loginWithGoogle = (credential: string) => {
+    api<Workspace>('/api/auth/google', { credential })
+      .then(openSession)
+      .catch(explain);
+  };
+
+  const register = (name: string, email: string, password: string, phone?: string) => {
+    const normalized = email.trim().toLowerCase();
+    if (normalized === ADMIN_EMAIL || knownEmails.current.has(normalized)) {
+      explain(new ApiError(normalized === ADMIN_EMAIL ? 'reserved_email' : 'email_taken'));
+      return;
+    }
+    knownEmails.current.add(normalized);
+    api<Workspace>('/api/auth/register', { name, email, password, phone })
+      .then((data) => {
+        applyWorkspace(data);
+        setViewState('dashboard');
+        showToast(
+          language === 'ar'
+            ? `تم إنشاء الحساب بنجاح! مرحباً بك ${data.user?.name || ''}`
+            : `Account created successfully! Welcome ${data.user?.name || ''}`,
+          'success'
+        );
+      })
+      .catch((error) => {
+        knownEmails.current.delete(normalized);
+        explain(error);
+      });
+  };
+
+  const updateProfile = (name: string, email: string) => {
+    api<Workspace>('/api/profile', { name, email })
+      .then((data) => {
+        applyWorkspace(data);
+        showToast(language === 'ar' ? 'تم حفظ التعديلات بنجاح' : 'Settings saved successfully', 'success');
+      })
+      .catch(explain);
   };
 
   const logout = () => {
-    setCurrentUser(null);
-    setCurrentView('landing');
-    showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Logged out successfully', 'info');
+    api<Workspace>('/api/auth/logout', {})
+      .then((data) => {
+        applyWorkspace(data);
+        setSelectedVehicleId(null);
+        setActiveConversationId(null);
+        setViewState('landing');
+        showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح. بياناتك محفوظة.' : 'Logged out. Your data is saved.', 'info');
+      })
+      .catch(explain);
   };
 
   const toggleUserStatus = (userId: string) => {
-    setAllUsers((prev) =>
-      prev.map((u) =>
-        u.id === userId ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u
-      )
-    );
-    showToast(language === 'ar' ? 'تم تحديث حالة المستخدم' : 'User status updated', 'info');
+    api<Workspace>('/api/admin/users/status', { userId })
+      .then((data) => {
+        applyWorkspace(data);
+        showToast(language === 'ar' ? 'تم تحديث حالة المستخدم' : 'User status updated', 'info');
+      })
+      .catch(explain);
   };
 
-  // Vehicles Actions
-  const addVehicle = (data: Omit<Vehicle, 'id' | 'qrToken' | 'scansCount' | 'reportsCount' | 'createdAt' | 'ownerId' | 'ownerName'>) => {
-    const token = 'SILA-' + data.brand.substring(0, 3).toUpperCase() + '-' + Math.floor(10000 + Math.random() * 90000);
-    const newVeh: Vehicle = {
-      ...data,
-      id: 'veh_' + Date.now(),
-      ownerId: currentUser?.id || 'usr_' + Date.now(),
-      ownerName: currentUser?.name || (language === 'ar' ? 'مالك المركبة' : 'Vehicle Owner'),
-      qrToken: token,
-      scansCount: 0,
-      reportsCount: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-      imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&auto=format&fit=crop&q=80'
-    };
+  const canManageVehicle = (vehicleId: string) => {
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    if (!vehicle || !currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    return currentUser.role === 'owner' && vehicle.ownerId === currentUser.id;
+  };
 
-    setVehicles((prev) => [newVeh, ...prev]);
-    setSelectedVehicleId(newVeh.id);
-
-    // Add activity
-    const newAct: ActivityEvent = {
-      id: 'act_' + Date.now(),
-      vehicleId: newVeh.id,
-      vehicleName: `${newVeh.brand} ${newVeh.model}`,
-      type: 'vehicle_added',
-      title: language === 'ar' ? 'تمت إضافة مركبة جديدة' : 'New Vehicle Added',
-      subtitle: `${newVeh.brand} ${newVeh.model} (${newVeh.plateNumber})`,
-      timeStr: 'Just now',
-      dateGroup: 'today',
-      tagText: 'Info',
-      tagType: 'info',
-      createdAt: new Date().toISOString()
-    };
-    setActivities((prev) => [newAct, ...prev]);
-
-    showToast(
-      language === 'ar'
-        ? `تمت إضافة ${newVeh.brand} ${newVeh.model} وتوليد رمز QR!`
-        : `${newVeh.brand} ${newVeh.model} registered with QR Code!`,
-      'success'
-    );
-    return newVeh;
+  const addVehicle = async (data: Omit<Vehicle, 'id' | 'qrToken' | 'scansCount' | 'reportsCount' | 'createdAt' | 'ownerId' | 'ownerName'>) => {
+    if (!currentUser || currentUser.role !== 'owner' || currentUser.status !== 'active') {
+      showToast(
+        currentUser?.status === 'inactive'
+          ? (language === 'ar' ? 'هذا الحساب موقوف ولا يمكنه إضافة سيارة' : 'This suspended account cannot add a vehicle')
+          : (language === 'ar' ? 'إضافة المركبات متاحة لصاحب الحساب النشط فقط' : 'Only an active vehicle owner can add a vehicle'),
+        'error'
+      );
+      return false;
+    }
+    try {
+      const workspace = await api<Workspace>('/api/vehicles', {
+        brand: data.brand,
+        model: data.model,
+        year: data.year,
+        color: data.color,
+        plateNumber: data.plateNumber
+      });
+      applyWorkspace(workspace);
+      showToast(
+        language === 'ar'
+          ? `تمت إضافة ${data.brand} ${data.model} وتوليد رمز QR خاص`
+          : `${data.brand} ${data.model} registered with a private QR code`,
+        'success'
+      );
+      return true;
+    } catch (error) {
+      explain(error);
+      return false;
+    }
   };
 
   const deleteVehicle = (id: string) => {
-    const target = vehicles.find((v) => v.id === id);
-    setVehicles((prev) => prev.filter((v) => v.id !== id));
-    if (selectedVehicleId === id) {
-      setSelectedVehicleId(null);
-    }
-    showToast(
-      language === 'ar'
-        ? `تم حذف ${target?.brand || ''} ${target?.model || 'السيارة'} بنجاح`
-        : 'Vehicle removed successfully',
-      'info'
-    );
+    api<Workspace>('/api/vehicles/delete', { id })
+      .then((data) => {
+        applyWorkspace(data);
+        if (selectedVehicleId === id) setSelectedVehicleId(null);
+        showToast(language === 'ar' ? 'تم حذف السيارة بنجاح' : 'Vehicle removed successfully', 'info');
+      })
+      .catch(explain);
   };
 
   const clearAllVehicles = () => {
-    setVehicles([]);
-    setSelectedVehicleId(null);
-    showToast(
-      language === 'ar'
-        ? 'تم حذف جميع المركبات التجريبية بنجاح! يمكنك الآن إضافة سيارتك.'
-        : 'All demo vehicles removed! You can now add your own vehicle.',
-      'success'
-    );
+    api<Workspace>('/api/vehicles/clear', {})
+      .then((data) => {
+        applyWorkspace(data);
+        setSelectedVehicleId(null);
+        showToast(language === 'ar' ? 'تم حذف مركبات هذا الحساب' : 'Your vehicles were removed', 'success');
+      })
+      .catch(explain);
   };
 
   const updateVehicleStatus = (id: string, status: Vehicle['status']) => {
-    setVehicles((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, status } : v))
-    );
-    showToast(language === 'ar' ? 'تم تحديث حالة السيارة' : 'Vehicle status updated', 'info');
+    api<Workspace>('/api/vehicles/status', { id, status })
+      .then((data) => {
+        applyWorkspace(data);
+        showToast(language === 'ar' ? 'تم تحديث حالة السيارة' : 'Vehicle status updated', 'info');
+      })
+      .catch(explain);
   };
 
   const regenerateQRToken = (id: string) => {
-    const targetVeh = vehicles.find((v) => v.id === id);
-    if (!targetVeh) return;
-    const newToken = 'SILA-' + targetVeh.brand.substring(0, 3).toUpperCase() + '-' + Math.floor(10000 + Math.random() * 90000);
-    setVehicles((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, qrToken: newToken } : v))
-    );
-    showToast(language === 'ar' ? 'تم تجديد رمز QR بنجاح' : 'New secure QR token generated!', 'success');
+    api<Workspace>('/api/vehicles/token', { id })
+      .then((data) => {
+        applyWorkspace(data);
+        showToast(language === 'ar' ? 'تم تجديد رمز QR برمز عشوائي جديد' : 'A new random QR token was created', 'success');
+      })
+      .catch(explain);
   };
 
-  // Visitor Report Submission
-  const submitVisitorReport = (data: {
+  const submitVisitorReport = async (data: {
     category: ReportCategory;
     title: string;
     description: string;
     hasLocation: boolean;
     locationName?: string;
-  }): Report => {
-    const targetVeh: Vehicle = activeScanVehicle || vehicles[0] || {
-      id: 'veh_demo_qr',
-      ownerId: 'usr_owner_demo',
-      ownerName: 'Vehicle Owner',
-      brand: 'Mercedes-Benz',
-      model: 'C-Class',
-      year: 2024,
-      color: 'Silver',
-      plateNumber: '77-99882',
-      qrToken: 'SILA-DEMO-77998',
-      status: 'active',
-      scansCount: 1,
-      reportsCount: 0,
-      createdAt: new Date().toISOString()
-    };
-    const reportId = 'rep_' + Date.now();
-    const sessionId = 'sess_' + Math.random().toString(36).substring(2, 8);
-
-    const newReport: Report = {
-      id: reportId,
-      vehicleId: targetVeh.id,
-      vehicleName: `${targetVeh.brand} ${targetVeh.model} (${targetVeh.year} • ${targetVeh.color})`,
-      vehiclePlate: targetVeh.plateNumber,
-      category: data.category,
-      title: data.title,
-      description: data.description,
-      hasLocation: data.hasLocation,
-      location: data.hasLocation
-        ? {
-            lat: 31.9522 + (Math.random() - 0.5) * 0.005,
-            lng: 35.2332 + (Math.random() - 0.5) * 0.005,
-            addressName: data.locationName || (language === 'ar' ? 'موقف الجامعة الغربي - البوابة 2' : 'University Parking West, Gate 2')
-          }
-        : undefined,
-      status: 'new',
-      reporterName: 'Anonymous',
-      reporterSessionId: sessionId,
-      createdAt: new Date().toISOString(),
-      timestamp: 'Today • ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setReports((prev) => [newReport, ...prev]);
-    setLastSubmittedReport(newReport);
-
-    // Update vehicle counts
-    setVehicles((prev) =>
-      prev.map((v) => (v.id === targetVeh.id ? { ...v, reportsCount: v.reportsCount + 1, scansCount: v.scansCount + 1 } : v))
-    );
-
-    // Add In-App Notification for Owner
-    const newNotif: AppNotification = {
-      id: 'notif_' + Date.now(),
-      userId: targetVeh.ownerId,
-      vehicleId: targetVeh.id,
-      reportId: newReport.id,
-      type: data.category === 'lights' ? 'lights_warning' : 'new_report',
-      title: data.category === 'lights' ? (language === 'ar' ? 'تنبيه أنوار' : 'Lights Warning') : (language === 'ar' ? 'بلاغ جديد عاجل' : 'New Report Alert'),
-      message: `${newReport.title}: ${newReport.description.substring(0, 60)}...`,
-      timeAgo: 'Just now',
-      createdAt: new Date().toISOString(),
-      isRead: false,
-      severity: data.category === 'blocking' ? 'urgent' : 'warning'
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-
-    // Add Activity
-    const newAct: ActivityEvent = {
-      id: 'act_' + Date.now(),
-      vehicleId: targetVeh.id,
-      vehicleName: `${targetVeh.brand} ${targetVeh.model}`,
-      type: data.category === 'lights' ? 'lights_warning' : 'report_received',
-      title: newReport.title,
-      subtitle: newReport.description.substring(0, 45) + '...',
-      timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      dateGroup: 'today',
-      tagText: 'New',
-      tagType: 'new',
-      createdAt: new Date().toISOString()
-    };
-    setActivities((prev) => [newAct, ...prev]);
-
-    // Initialize an empty conversation for this report
-    const newConv: Conversation = {
-      id: 'conv_' + reportId,
-      reportId: reportId,
-      vehicleId: targetVeh.id,
-      vehicleName: `${targetVeh.brand} ${targetVeh.model}`,
-      vehiclePlate: targetVeh.plateNumber,
-      lastMessage: data.description,
-      lastMessageTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      unreadCount: 0,
-      reporterSessionId: sessionId,
-      status: 'open',
-      messages: [
-        {
-          id: 'msg_' + Date.now(),
-          conversationId: 'conv_' + reportId,
-          senderRole: 'reporter',
-          senderName: 'Anonymous Reporter',
-          text: data.description,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          createdAt: new Date().toISOString(),
-          isRead: true
-        }
-      ]
-    };
-    setConversations((prev) => [newConv, ...prev]);
-    setActiveConversationId(newConv.id);
-
-    return newReport;
-  };
-
-  // Report status updates
-  const updateReportStatus = (reportId: string, status: ReportStatus) => {
-    setReports((prev) =>
-      prev.map((r) => (r.id === reportId ? { ...r, status } : r))
-    );
-
-    if (status === 'resolved') {
-      const rep = reports.find((r) => r.id === reportId);
-      const newAct: ActivityEvent = {
-        id: 'act_' + Date.now(),
-        vehicleId: rep?.vehicleId,
-        vehicleName: rep?.vehicleName,
-        type: 'report_resolved',
-        title: language === 'ar' ? 'تم حل البلاغ' : 'Report Resolved',
-        subtitle: rep ? `${rep.title} - ${rep.vehiclePlate}` : 'Marked resolved by owner',
-        timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        dateGroup: 'today',
-        tagText: 'Resolved',
-        tagType: 'resolved',
-        createdAt: new Date().toISOString()
-      };
-      setActivities((prev) => [newAct, ...prev]);
+  }): Promise<Report> => {
+    const token = activeScanVehicle?.qrToken;
+    if (!token) {
+      showToast(
+        language === 'ar' ? 'اختر سيارة مسجّلة قبل إرسال التنبيه' : 'Choose a registered car before sending the alert',
+        'error'
+      );
+      return emptyReport(data);
     }
-
-    showToast(
-      language === 'ar'
-        ? status === 'resolved'
-          ? 'تم تحديد البلاغ كـ "تم الحل" ✓'
-          : 'تم تحديث حالة البلاغ'
-        : status === 'resolved'
-        ? 'Report marked as Resolved ✓'
-        : `Report status updated to ${status}`,
-      'success'
-    );
+    try {
+      const created = await api<{ conversation: Conversation }>('/api/public/reports', {
+        token,
+        category: data.category,
+        title: data.title,
+        description: data.description
+      });
+      const workspace = await api<Workspace>('/api/bootstrap');
+      applyWorkspace(workspace);
+      setActiveConversationId(created.conversation.id);
+      const report: Report = {
+        ...emptyReport(data),
+        id: created.conversation.reportId,
+        vehiclePlate: activeScanVehicle?.plateNumber || '',
+        status: 'new'
+      };
+      setLastSubmittedReport(report);
+      return report;
+    } catch (error) {
+      explain(error);
+      return emptyReport(data);
+    }
   };
 
-  // Chat message sending
+  const updateReportStatus = (reportId: string, status: ReportStatus) => {
+    api<Workspace>('/api/reports/status', { id: reportId, status })
+      .then((data) => {
+        applyWorkspace(data);
+        showToast(
+          language === 'ar'
+            ? status === 'resolved'
+              ? 'تم تحديد البلاغ كـ "تم الحل"'
+              : 'تم تحديث حالة البلاغ'
+            : status === 'resolved'
+            ? 'Report marked as resolved'
+            : 'Report status updated',
+          'success'
+        );
+      })
+      .catch(explain);
+  };
+
   const sendMessage = (conversationId: string, text: string, senderRole: 'owner' | 'reporter') => {
     if (!text.trim()) return;
+    const path = senderRole === 'owner' ? '/api/messages' : '/api/public/messages';
+    api<Workspace>(path, { conversationId, text })
+      .then(applyWorkspace)
+      .catch(explain);
+  };
 
-    const newMsg: ChatMessage = {
-      id: 'msg_' + Date.now() + Math.random().toString(36).substring(2, 4),
-      conversationId,
-      senderRole,
-      senderName: senderRole === 'owner' ? 'Ahmed (Owner)' : 'Anonymous Reporter',
-      text: text.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdAt: new Date().toISOString(),
-      isRead: true
-    };
 
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === conversationId) {
-          return {
-            ...c,
-            lastMessage: text.trim(),
-            lastMessageTime: newMsg.timestamp,
-            messages: [...c.messages, newMsg]
-          };
-        }
-        return c;
-      })
-    );
+  // Notifications helpers
+  const ownerVehicleIds = new Set(
+    vehicles.filter((vehicle) => currentUser && vehicle.ownerId === currentUser.id).map((vehicle) => vehicle.id)
+  );
+  const visibleVehicles = currentUser?.role === 'owner'
+    ? vehicles.filter((vehicle) => vehicle.ownerId === currentUser.id)
+    : vehicles;
+  const visibleReports = currentUser?.role === 'owner'
+    ? reports.filter((report) => ownerVehicleIds.has(report.vehicleId))
+    : reports;
+  const visibleConversations = currentUser?.role === 'owner'
+    ? conversations.filter((conversation) =>
+        conversation.side === 'reporter' || ownerVehicleIds.has(conversation.vehicleId))
+    : conversations;
+  const visibleNotifications = currentUser?.role === 'admin'
+    ? notifications
+    : currentUser
+    ? notifications.filter((item) => item.userId === currentUser.id)
+    : [];
+  const visibleActivities = currentUser?.role === 'admin'
+    ? activities
+    : currentUser
+    ? activities.filter((item) => !!item.vehicleId && ownerVehicleIds.has(item.vehicleId))
+    : [];
+  const visibleUsers = currentUser?.role === 'admin'
+    ? accounts.map((account) => ({
+        id: account.id,
+        name: account.name,
+        email: account.email,
+        role: account.role,
+        avatar: account.avatar,
+        createdAt: account.createdAt,
+        status: account.status,
+        vehiclesCount: vehicles.filter((vehicle) => vehicle.ownerId === account.id).length
+      }))
+    : [];
 
-    // If owner replied, optionally simulate an anonymous visitor response after 2.5 seconds to show rich interaction!
-    if (senderRole === 'owner') {
-      setTimeout(() => {
-        const autoResponses = [
-          language === 'ar' ? 'شكراً جزيلاً لتعاونك وسرعة الرد! 👍' : 'Thank you so much for the quick response! 👍',
-          language === 'ar' ? 'تمام يعطيك العافية، بانتظارك.' : 'Great, thank you! Standing by.',
-          language === 'ar' ? 'تم الاستلام، شكراً لك.' : 'Got it, thank you!'
-        ];
-        const randomResp = autoResponses[Math.floor(Math.random() * autoResponses.length)];
-        const autoMsg: ChatMessage = {
-          id: 'msg_auto_' + Date.now(),
-          conversationId,
-          senderRole: 'reporter',
-          senderName: 'Anonymous Reporter',
-          text: randomResp,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          createdAt: new Date().toISOString(),
-          isRead: false
-        };
-
-        setConversations((prev) =>
-          prev.map((c) => {
-            if (c.id === conversationId) {
-              return {
-                ...c,
-                lastMessage: randomResp,
-                lastMessageTime: autoMsg.timestamp,
-                messages: [...c.messages, autoMsg]
-              };
-            }
-            return c;
-          })
-        );
-
-        // Notify owner of new chat message
-        setNotifications((prev) => [
-          {
-            id: 'notif_msg_' + Date.now(),
-            userId: 'usr_ahmed_1',
-            type: 'chat_message',
-            title: language === 'ar' ? 'رسالة جديدة من المُبلّغ' : 'New message from reporter',
-            message: randomResp,
-            timeAgo: 'Just now',
-            createdAt: new Date().toISOString(),
-            isRead: false,
-            severity: 'info'
-          },
-          ...prev
-        ]);
-      }, 2500);
+  const findVehicleByCode = async (code: string): Promise<Vehicle | null> => {
+    const typed = code.trim();
+    if (!typed) return null;
+    try {
+      const data = await api<{ vehicle: Parameters<typeof toVisitorVehicle>[0] }>(
+        `/api/public/vehicle?code=${encodeURIComponent(typed)}`
+      );
+      return toVisitorVehicle(data.vehicle);
+    } catch {
+      return null;
     }
   };
 
-  // Notifications helpers
-  const unreadNotifsCount = notifications.filter((n) => !n.isRead).length;
+  const markMessagesRead = (conversationId: string) => {
+    api<Workspace>('/api/messages/read', { conversationId }).then(applyWorkspace).catch(() => undefined);
+  };
+
+  const unreadNotifsCount = visibleNotifications.filter((n) => !n.isRead).length;
+  const adminStats = {
+    totalUsers: currentUser?.role === 'admin' ? accounts.length : 0,
+    totalVehicles: visibleVehicles.length,
+    totalScans: visibleVehicles.reduce((sum, vehicle) => sum + (vehicle.scansCount || 0), 0),
+    resolvedReportsRate: visibleReports.length
+      ? Math.round((visibleReports.filter((report) => report.status === 'resolved').length / visibleReports.length) * 100)
+      : 0
+  };
 
   const markNotificationAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+    api<Workspace>('/api/notifications/read', { id }).then(applyWorkspace).catch(explain);
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    showToast(language === 'ar' ? 'تم تحديد كل الإشعارات كمقروءة' : 'All notifications marked as read', 'info');
+    api<Workspace>('/api/notifications/read', { all: true })
+      .then((data) => {
+        applyWorkspace(data);
+        showToast(language === 'ar' ? 'تم تحديد كل الإشعارات كمقروءة' : 'All notifications marked as read', 'info');
+      })
+      .catch(explain);
   };
 
   return (
@@ -686,12 +771,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentUser,
         setCurrentUser,
         login,
+        loginWithGoogle,
         register,
+        updateProfile,
         logout,
-        allUsers,
+        allUsers: visibleUsers,
+        users: visibleUsers,
+        adminStats,
         toggleUserStatus,
 
-        vehicles,
+        vehicles: visibleVehicles,
         selectedVehicleId,
         setSelectedVehicleId,
         addVehicle,
@@ -702,27 +791,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         activeScanVehicle,
         setActiveScanVehicle,
+        findVehicleByCode,
         submitVisitorReport,
         lastSubmittedReport,
 
-        reports,
+        reports: visibleReports,
         selectedReportId,
         setSelectedReportId,
         updateReportStatus,
 
-        conversations,
+        conversations: visibleConversations,
         activeConversationId,
         setActiveConversationId,
         sendMessage,
+        markMessagesRead,
 
-        notifications,
+        notifications: visibleNotifications,
         unreadNotifsCount,
         markNotificationAsRead,
         markAllNotificationsAsRead,
-        activities,
+        activities: visibleActivities,
 
         toasts,
         showToast,
+        pings,
 
         qrModalVehicle,
         setQrModalVehicle,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Mail, Lock, User as UserIcon, Eye, EyeOff, ShieldCheck, Phone } from 'lucide-react';
 
@@ -6,8 +6,50 @@ interface AuthPageProps {
   initialMode?: 'login' | 'register';
 }
 
+type GoogleIdClient = {
+  initialize: (config: {
+    client_id: string;
+    callback: (response: { credential?: string }) => void;
+    auto_select?: boolean;
+    cancel_on_tap_outside?: boolean;
+    ux_mode?: 'popup' | 'redirect';
+    context?: 'signin' | 'signup' | 'use';
+  }) => void;
+  renderButton: (parent: HTMLElement, options: Record<string, string | number>) => void;
+};
+
+function loadGoogleId(): Promise<GoogleIdClient> {
+  const ready = () => (window as Window & { google?: { accounts?: { id?: GoogleIdClient } } }).google?.accounts?.id;
+  const existing = ready();
+  if (existing) return Promise.resolve(existing);
+
+  return new Promise((resolve, reject) => {
+    const finish = () => {
+      const googleId = ready();
+      if (googleId) resolve(googleId);
+      else reject(new Error('google-missing'));
+    };
+    const current = document.querySelector<HTMLScriptElement>('script[data-google-identity="true"]');
+    if (current) {
+      if (ready()) finish();
+      else {
+        current.addEventListener('load', finish, { once: true });
+        current.addEventListener('error', () => reject(new Error('google-script')), { once: true });
+      }
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.dataset.googleIdentity = 'true';
+    script.onload = finish;
+    script.onerror = () => reject(new Error('google-script'));
+    document.head.appendChild(script);
+  });
+}
+
 export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => {
-  const { currentView, setCurrentView, login, register, t, language, theme, showToast } = useApp();
+  const { currentView, setCurrentView, login, register, loginWithGoogle, t, language, theme, showToast } = useApp();
   const isRegister = currentView === 'register' || initialMode === 'register';
 
   const [name, setName] = useState('');
@@ -17,6 +59,63 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const googleAuthRef = useRef({ loginWithGoogle, showToast, language });
+  googleAuthRef.current = { loginWithGoogle, showToast, language };
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+    const parent = googleButtonRef.current;
+    if (!clientId || !parent) return;
+    let cancelled = false;
+
+    loadGoogleId()
+      .then((googleId) => {
+        if (cancelled || !googleButtonRef.current) return;
+        googleId.initialize({
+          client_id: clientId,
+          ux_mode: 'popup',
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          context: 'signin',
+          callback: (response) => {
+            const actions = googleAuthRef.current;
+            if (!response.credential) {
+              actions.showToast(
+                actions.language === 'ar' ? 'تعذر قراءة حساب Google المختار' : 'Could not read the selected Google account',
+                'error'
+              );
+              return;
+            }
+            actions.loginWithGoogle(response.credential);
+          },
+        });
+        parent.replaceChildren();
+        const width = Math.min(Math.max(parent.clientWidth, 280), 400);
+        googleId.renderButton(parent, {
+          type: 'standard',
+          theme: theme === 'dark' ? 'filled_black' : 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'pill',
+          width,
+          logo_alignment: 'center',
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        googleAuthRef.current.showToast(
+          googleAuthRef.current.language === 'ar'
+            ? 'تعذر فتح زر حسابات Google'
+            : 'Could not open the Google account button',
+          'error'
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [theme]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) {
@@ -29,19 +128,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
         showToast(language === 'ar' ? 'يرجى إدخال الاسم الكامل' : 'Please enter full name', 'warning');
         return;
       }
-      if (!email.trim()) {
-        showToast(language === 'ar' ? 'يرجى إدخال البريد الإلكتروني' : 'Please enter email', 'warning');
+      if (!email.trim() || !email.includes('@')) {
+        showToast(
+          language === 'ar' ? 'البريد لازم يكون فيه @ مثل name@gmail.com' : 'The email needs an @ sign, like name@gmail.com',
+          'warning'
+        );
         return;
       }
-      if (!password.trim()) {
-        showToast(language === 'ar' ? 'يرجى إدخال كلمة المرور' : 'Please enter password', 'warning');
+      if (password.trim().length < 6) {
+        showToast(
+          language === 'ar' ? 'كلمة المرور لازم تكون 6 أحرف على الأقل' : 'The password must be at least 6 characters',
+          'warning'
+        );
         return;
       }
       if (password !== confirmPassword) {
         showToast(language === 'ar' ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match', 'warning');
         return;
       }
-      register(name.trim(), email.trim());
+      register(name.trim(), email.trim(), password, phone.trim());
     } else {
       if (!email.trim()) {
         showToast(language === 'ar' ? 'يرجى إدخال البريد الإلكتروني' : 'Please enter email', 'warning');
@@ -51,20 +156,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
         showToast(language === 'ar' ? 'يرجى إدخال كلمة المرور' : 'Please enter password', 'warning');
         return;
       }
-      login(email.trim(), email.toLowerCase().includes('admin') ? 'admin' : 'owner');
+      login(email.trim(), password);
     }
   };
 
   return (
-    <div className={`min-h-[90vh] w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 transition-colors duration-300 ${
+    <div className={`min-h-[90vh] w-full flex items-center justify-center p-3 sm:p-6 lg:p-8 transition-colors duration-300 ${
       theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-900'
     }`}>
       <div className={`w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 border transition-colors ${
-        theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+        theme === 'dark' ? 'bg-[#0a2430] border-cyan-500/20' : 'bg-white border-slate-200'
       }`}>
         
         {/* LEFT COLUMN: AUTH FORM */}
-        <div className={`lg:col-span-6 p-6 sm:p-10 flex flex-col justify-between text-start ${
+        <div className={`lg:col-span-6 p-4 sm:p-10 flex flex-col justify-between text-start ${
           theme === 'dark' ? 'text-slate-100' : 'text-slate-900'
         }`}>
           <div>
@@ -73,7 +178,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+              <h2 className="text-xl font-black tracking-tight sm:text-3xl">
                 {isRegister ? (language === 'ar' ? 'إنشاء حساب مالك مركبة' : 'Create Owner Account') : t('welcomeBack')}
               </h2>
               <p className={`text-xs sm:text-sm mt-1.5 font-medium ${
@@ -107,7 +212,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                       placeholder={language === 'ar' ? 'أدخل اسمك الكامل' : 'Enter your full name'}
                       className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                         theme === 'dark' 
-                          ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
+                          ? 'bg-[#041820] border-cyan-500/20 text-white placeholder:text-slate-500' 
                           : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
                       }`}
                     />
@@ -134,7 +239,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                       placeholder={language === 'ar' ? 'مثال: 059XXXXXXXX' : '+970 59 XXX XXXX'}
                       className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                         theme === 'dark' 
-                          ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
+                          ? 'bg-[#041820] border-cyan-500/20 text-white placeholder:text-slate-500' 
                           : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
                       }`}
                     />
@@ -161,7 +266,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                     placeholder={language === 'ar' ? 'user@example.com' : 'name@example.com'}
                     className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                       theme === 'dark' 
-                        ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
+                        ? 'bg-[#041820] border-cyan-500/20 text-white placeholder:text-slate-500' 
                         : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
                     }`}
                   />
@@ -180,7 +285,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                     <button
                       type="button"
                       onClick={() => showToast(language === 'ar' ? 'تم إرسال رابط إعادة التعيين لبريدك' : 'Reset link sent to your email', 'info')}
-                      className="text-[11px] text-blue-500 hover:underline font-semibold cursor-pointer"
+                      className="text-[11px] text-cyan-400 hover:underline font-semibold cursor-pointer"
                     >
                       {t('forgotPassword')}
                     </button>
@@ -198,7 +303,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                     placeholder="••••••••"
                     className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-10 rtl:pr-4 rtl:pl-10 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                       theme === 'dark' 
-                        ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
+                        ? 'bg-[#041820] border-cyan-500/20 text-white placeholder:text-slate-500' 
                         : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
                     }`}
                   />
@@ -232,7 +337,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                       placeholder="••••••••"
                       className={`w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${
                         theme === 'dark' 
-                          ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
+                          ? 'bg-[#041820] border-cyan-500/20 text-white placeholder:text-slate-500' 
                           : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
                       }`}
                     />
@@ -259,11 +364,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
               {/* Submit Button */}
               <button
                 type="submit"
-                onClick={() => handleSubmit()}
                 className={`w-full py-3.5 px-4 rounded-xl text-white font-bold text-sm shadow-xl transition-all cursor-pointer mt-3 flex items-center justify-center gap-2 ${
                   isRegister
                     ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
+                    : 'bg-cyan-500 hover:bg-cyan-400 shadow-cyan-600/30'
                 }`}
               >
                 <span>{isRegister ? (language === 'ar' ? 'إنشاء حساب جديد' : 'Create Account') : t('login')}</span>
@@ -273,54 +377,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
             {/* Divider */}
             <div className="relative my-6 text-center">
               <div className="absolute inset-0 flex items-center">
-                <div className={`w-full border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}></div>
+                <div className={`w-full border-t ${theme === 'dark' ? 'border-cyan-500/15' : 'border-slate-200'}`}></div>
               </div>
               <span className={`relative px-3 text-xs font-semibold uppercase ${
-                theme === 'dark' ? 'bg-slate-900 text-slate-500' : 'bg-white text-slate-400'
+                theme === 'dark' ? 'bg-[#0a2430] text-slate-500' : 'bg-white text-slate-400'
               }`}>
                 {t('or')}
               </span>
             </div>
 
-            {/* Google OAuth button */}
-            <button
-              type="button"
-              onClick={() => {
-                const userEmail = email.trim() || 'user@gmail.com';
-                const userName = name.trim() || (language === 'ar' ? 'مستخدم جديد' : 'New User');
-                register(userName, userEmail);
-              }}
-              className={`w-full py-3 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
-                theme === 'dark'
-                  ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-750'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-              }`}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>{t('continueWithGoogle')}</span>
-            </button>
+            <div ref={googleButtonRef} className="flex min-h-11 w-full justify-center"></div>
           </div>
 
           {/* Bottom Switch Link */}
           <div className={`mt-8 text-center text-xs pt-4 border-t ${
-            theme === 'dark' ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'
+            theme === 'dark' ? 'border-cyan-500/15 text-slate-400' : 'border-slate-100 text-slate-500'
           }`}>
             {isRegister ? (
               <span>
@@ -339,7 +410,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                 <button
                   type="button"
                   onClick={() => setCurrentView('register')}
-                  className="font-bold text-blue-500 hover:underline cursor-pointer"
+                  className="font-bold text-cyan-400 hover:underline cursor-pointer"
                 >
                   {language === 'ar' ? 'أنشئ حسابك الآن' : t('register')}
                 </button>

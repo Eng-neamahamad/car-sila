@@ -2,7 +2,6 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
-import { DemoSwitcher } from './components/common/DemoSwitcher';
 import { PrintQRModal } from './components/common/PrintQRModal';
 import { AddVehicleModal } from './components/common/AddVehicleModal';
 
@@ -31,7 +30,7 @@ import { AdminReportsView } from './components/admin/AdminReportsView';
 import { AdminSecurityView } from './components/admin/AdminSecurityView';
 
 const AppContent: React.FC = () => {
-  const { currentView, toasts, language, theme } = useApp();
+  const { currentView, toasts, pings, language, theme } = useApp();
 
   const renderContent = () => {
     switch (currentView) {
@@ -57,15 +56,11 @@ const AppContent: React.FC = () => {
         );
 
       // 3. Visitor QR Flow (Screens 5, 6, 7)
+      case 'qr-scan':
       case 'qr-scan-flow':
+      case 'qr-report-form':
       case 'qr-submitted':
-        return (
-          <>
-            <Navbar />
-            <QRScanFlow />
-            <Footer />
-          </>
-        );
+        return <QRScanFlow />;
 
       // 4. Owner Portal (Screens 8 - 16)
       case 'dashboard':
@@ -174,7 +169,7 @@ const AppContent: React.FC = () => {
   return (
     <div
       dir={language === 'ar' ? 'rtl' : 'ltr'}
-      className={`min-h-screen font-sans selection:bg-blue-500 selection:text-white transition-colors duration-300 ${
+      className={`min-h-screen overflow-x-hidden font-sans selection:bg-cyan-500 selection:text-white transition-colors duration-300 ${
         theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}
     >
@@ -187,8 +182,18 @@ const AppContent: React.FC = () => {
       {/* Global Add Vehicle Modal */}
       <AddVehicleModal />
 
-      {/* Global Interactive Demo Navigation Switcher */}
-      <DemoSwitcher />
+      {pings.length > 0 && (
+        <div className="fixed top-20 left-1/2 z-[60] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col gap-2">
+          {pings.map((ping) => (
+            <div
+              key={ping.id}
+              className="rounded-2xl border border-cyan-400/40 bg-[#041820]/95 px-4 py-3 text-sm font-bold text-white shadow-xl shadow-black/40"
+            >
+              {ping.message}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Global Notification Toasts */}
       {toasts.length > 0 && (

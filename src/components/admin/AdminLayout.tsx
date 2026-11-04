@@ -9,10 +9,10 @@ import {
   LogOut,
   Globe,
   Sliders,
-  ShieldCheck,
   Sun,
   Moon
 } from 'lucide-react';
+import logo from '../../assets/logo.png';
 import { AppView } from '../../types';
 
 interface AdminLayoutProps {
@@ -47,7 +47,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }`}>
       
       {/* ADMIN SIDEBAR */}
-      <aside className={`w-full md:w-64 flex flex-col justify-between shrink-0 border-r z-30 transition-colors ${
+      <aside className={`hidden md:flex md:w-64 flex-col justify-between shrink-0 border-r z-30 transition-colors ${
         theme === 'dark'
           ? 'bg-slate-950 text-slate-300 border-slate-800'
           : 'bg-white text-slate-700 border-slate-200 shadow-sm'
@@ -61,9 +61,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               onClick={() => setCurrentView('landing')}
               className="flex items-center gap-2.5 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center font-black text-white text-xs shadow-md shadow-purple-600/30">
-                CS
-              </div>
+              <img src={logo} alt="" className="h-8 w-auto object-contain lg:h-10" />
               <div className="text-start">
                 <span className={`font-extrabold text-base block leading-none ${
                   theme === 'dark' ? 'text-white' : 'text-slate-900'
@@ -141,17 +139,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className={`p-4 border-t space-y-3 ${
           theme === 'dark' ? 'border-slate-800' : 'border-slate-100'
         }`}>
-          <button
-            onClick={() => setCurrentView('dashboard')}
-            className={`w-full py-2 px-3 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-              theme === 'dark'
-                ? 'bg-slate-900 hover:bg-slate-800 text-purple-300 border-purple-900/50'
-                : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200'
-            }`}
-          >
-            ← {language === 'ar' ? 'التبديل إلى واجهة المالك' : 'Switch to Owner View'}
-          </button>
-
           <div className="flex items-center gap-3 px-2">
             <div className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs ${
               theme === 'dark'
@@ -187,7 +174,45 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       </aside>
 
       {/* ADMIN CONTENT */}
-      <main className={`flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen transition-colors ${
+      <div className={`md:hidden sticky top-0 z-30 border-b ${
+        theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex h-14 items-center justify-between gap-2 px-3">
+          <button type="button" onClick={() => setCurrentView('landing')} className="flex min-w-0 items-center gap-2">
+            <img src={logo} alt="" className="h-8 w-auto shrink-0 object-contain" />
+            <span className="truncate text-lg font-black">CAR-SILA</span>
+          </button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={toggleTheme} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700" aria-label="Toggle Theme">
+              {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button type="button" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700" aria-label="Toggle Language">
+              <Globe className="h-4 w-4 text-purple-400" />
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 overflow-x-auto px-3 pb-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setCurrentView(item.id)}
+                className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold ${
+                  isActive ? 'bg-purple-600 text-white' : theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <main className={`flex-1 flex flex-col min-w-0 overflow-y-auto md:max-h-screen transition-colors ${
         theme === 'dark' ? 'bg-slate-900' : 'bg-slate-100'
       }`}>
         <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">

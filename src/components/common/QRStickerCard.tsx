@@ -5,13 +5,13 @@ import {
   Download,
   Printer,
   ShieldCheck,
-  Car,
   Copy,
   Check,
   FileDown,
   ExternalLink,
   Share2
 } from 'lucide-react';
+import logo from '../../assets/logo.png';
 import { useApp } from '../../context/AppContext';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -231,15 +231,14 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
         className="flex flex-col items-center bg-white border-2 border-slate-300 rounded-3xl p-5 shadow-xl shadow-slate-200/50 w-full text-center relative overflow-hidden"
       >
         {/* Top subtle decorative strip */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500" />
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-cyan-400 via-sky-500 to-cyan-600" />
 
-        {/* Sticker Header Badge */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-black mb-2.5 tracking-wide mt-1">
-          <Car className="w-3.5 h-3.5 text-blue-600" />
-          <span>CAR-SILA IDENTITY</span>
-        </div>
+        <img
+          src={logo}
+          alt="CAR-SILA"
+          className="h-20 w-auto object-contain mt-2 mb-2"
+        />
 
-        {/* Vehicle Info */}
         <h3 className="font-black text-slate-900 text-base leading-tight">
           {vehicle.brand} {vehicle.model}
         </h3>
@@ -247,7 +246,6 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
           {vehicle.plateNumber}
         </div>
 
-        {/* QR Canvas */}
         <div className="p-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl my-3.5 flex items-center justify-center shadow-inner">
           <canvas ref={canvasRef} className="rounded-xl shadow-sm" />
         </div>
@@ -263,10 +261,6 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
           </p>
         </div>
 
-        {/* Security watermark footer */}
-        <div className="pt-2 border-t border-slate-100 text-[10px] font-mono text-slate-400">
-          Token: {vehicle.qrToken}
-        </div>
       </div>
 
       {/* Action Buttons Toolbar */}
@@ -285,7 +279,7 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
 
             <button
               onClick={handleCopyImage}
-              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md shadow-slate-900/20 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#041820] hover:bg-[#063040] text-white text-xs font-bold border border-cyan-500/20 shadow-md shadow-cyan-900/20 transition-all cursor-pointer"
             >
               {copiedImage ? (
                 <>
@@ -294,7 +288,7 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 text-blue-400" />
+                  <Copy className="w-4 h-4 text-cyan-300" />
                   <span>{language === 'ar' ? 'نسخ كصورة' : 'Copy Image'}</span>
                 </>
               )}
@@ -305,9 +299,9 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleDownloadImage}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#041820] hover:bg-white/5 text-slate-200 text-xs font-bold transition-colors cursor-pointer border border-cyan-500/20"
             >
-              <Download className="w-3.5 h-3.5 text-slate-600" />
+              <Download className="w-3.5 h-3.5 text-cyan-300" />
               <span>{language === 'ar' ? 'تحميل صورة PNG' : 'Save PNG'}</span>
             </button>
 
@@ -316,7 +310,7 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
                 if (onPrint) onPrint();
                 else setPrintModalVehicle(vehicle);
               }}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm shadow-blue-600/30 transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-bold shadow-sm shadow-cyan-600/30 transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>{language === 'ar' ? 'نافذة الطباعة' : 'Print View'}</span>
@@ -342,7 +336,7 @@ export const QRStickerCard: React.FC<QRStickerCardProps> = ({
           {/* Copy Direct URL Link */}
           <button
             onClick={handleCopyLink}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 text-blue-700 text-[11px] font-semibold transition-colors cursor-pointer border border-blue-200/60"
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-200 text-[11px] font-semibold transition-colors cursor-pointer border border-cyan-500/20"
           >
             {copiedLink ? (
               <>
