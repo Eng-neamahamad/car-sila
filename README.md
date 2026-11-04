@@ -1,106 +1,79 @@
 # CAR-SILA
 
-هوية رقمية للسيارة، من غير ما ينكشف رقم الهاتف.
+A digital identity for a car, without exposing a phone number.
 
-CAR-SILA منصة ويب تربط السائق المار بصاحب السيارة عبر رمز QR. المار يمسح الملصق، يرسل بلاغاً، ويكمل المحادثة. صاحب السيارة يستقبل التنبيه والرسالة داخل حسابه، ورقمه يبقى مخفياً.
+CAR-SILA is a web platform that connects a passerby to a vehicle owner through a QR code. The passerby scans the sticker, sends a report, and continues in a private thread. The owner receives the alert and the message inside their account. The phone number stays hidden.
 
-النسخة المنشورة: [car-sila-sand.vercel.app](https://car-sila-sand.vercel.app)
+Published site: [car-sila-sand.vercel.app](https://car-sila-sand.vercel.app)
 
----
+## The problem
 
-## المشكلة
+Leaving a mobile number on a car window gives every passerby a personal contact channel. Random calls, saved numbers, and messages outside the original situation all follow from that habit.
 
-كتابة رقم الجوال على زجاج السيارة تنشر وسيلة تواصل شخصية مع أي شخص في الشارع. الاتصال العشوائي، والرسائل المجهولة، وحفظ الرقم خارج سياق الموقف، كلها نتيجة مباشرة لهذا الأسلوب.
+CAR-SILA separates “I need to reach the owner of this car” from “I want their phone number.”
 
-CAR-SILA تفصل بين «أحتاج أتواصل مع صاحب هذه السيارة» وبين «أريد رقمه».
+## What happens on a scan
 
-## ماذا يحدث عند المسح
+1. The owner creates an account and registers a vehicle.
+2. The platform generates a unique code for that vehicle, ready to print as a sticker.
+3. A passerby scans the code with a phone camera, or types the plate. No app, and no account is required.
+4. Only public vehicle details are shown: brand, model, year, color, and plate.
+5. The passerby chooses a reason and writes a note. The owner receives it in the product, and by email when mail is configured.
+6. Both sides continue in the thread attached to that report. The owner sees every conversation. The sender sees the reply in the same visit.
 
-1. صاحب السيارة ينشئ حساباً ويضيف المركبة.
-2. المنصة تولّد رمزاً فريداً لكل سيارة، جاهزاً للطباعة على ملصق.
-3. المار يمسح الرمز بكاميرا الهاتف، أو يكتب رقم اللوحة. لا تطبيق، ولا حساب إلزامي.
-4. تظهر له بيانات السيارة العامة فقط: الماركة، الطراز، السنة، اللون، واللوحة.
-5. يختار سبب البلاغ ويكتب ملاحظة. تصل الرسالة لصاحب السيارة داخل المنصة، وبريداً إذا كان الإرسال مضبوطاً.
-6. الطرفان يكملان في محادثة مرتبطة بهذا البلاغ. صاحب السيارة يرى كل المحادثات. المُرسِل يرى رده في نفس الجلسة.
+## Who sees what
 
-## ماذا يرى كل طرف
-
-| الطرف | ما يصل إليه | ما لا يصل إليه |
+| Party | Can see | Cannot see |
 | --- | --- | --- |
-| المار | السيارة العامة، إرسال بلاغ، محادثة هذه الجلسة | هاتف المالك، بريده، وباقي سياراته |
-| المالك | مركباته، البلاغات، المحادثات، التنبيه داخل الصفحة | هاتف المار |
-| الإدارة | لوحة متابعة الحسابات والمركبات والبلاغات | الدخول بحساب Google |
+| Passerby | Public vehicle details, the report form, and this visit’s thread | The owner’s phone, email, or other vehicles |
+| Owner | Their vehicles, reports, conversations, and the in-page alert | The passerby’s phone |
+| Administrator | An overview of accounts, vehicles, and reports | Google sign-in |
 
-التنبيه داخل الموقع يظهر أعلى الصفحة لثوانٍ ثم يختفي، مع صوت قصير، عندما يصل بلاغ أو رسالة جديدة. الرقم بجانب المحادثات يبقى حتى تُفتح المحادثة نفسها.
+A new report or message raises a short notice near the top of the page. It disappears after a few seconds and plays a brief tick. The count beside Messages stays until that conversation is opened.
 
-## الخصوصية والأمان
+## Privacy and security
 
-- قاعدة البيانات لا تُفتح من المتصفح. الخادم وحده يستخدم مفتاح Supabase، والصفوف محمية بسياسات الوصول.
-- جلسة المستخدم كوكي HttpOnly. الزائر يُعرف بجلسة زيارة، لا بحساب.
-- البحث العام عن سيارة لا يُرجع الهاتف ولا البريد ولا معرّف المالك.
-- رسائل البريد لا تضع بريد المُرسِل في نص الرسالة.
-- تسجيل الدخول بكلمة المرور أو Google. حساب الإدارة لا يدخل عبر Google.
-- الطلبات الحساسة عليها حد للمحاولات، والخادم يضيف ترويسات حماية أساسية.
+- The database is not opened from the browser. Only the server uses the database key, and row access is restricted.
+- The user session is an HttpOnly cookie. A passerby is identified by a visit session, not by an account.
+- A public vehicle lookup does not return a phone, an email, or an owner id.
+- Report emails do not place the sender’s email address in the message body.
+- Owners sign in with email and password, or with Google. The administrator signs in with email and password only.
+- Sensitive requests are rate-limited, and the server adds baseline security headers.
 
-## التقنية
+## Stack
 
-- الواجهة: React 19، TypeScript، Vite
-- الخادم: Node.js و Express، نفس عملية التطوير مع الواجهة
-- البيانات: Supabase
-- الدخول: بريد وكلمة مرور، أو Google Identity Services
-- البريد: SMTP عبر Nodemailer، ويُتخطى بصمت إذا لم تُضبط بياناته
-- الاستضافة: Vercel، والواجهة والـ API على نفس النطاق
-- مسح الرمز: كاميرا الهاتف عبر المتصفح
+- Interface: React 19, TypeScript, and Vite
+- Server: Node.js and Express, started together with the interface in development
+- Data: Supabase
+- Sign-in: email and password, or Google Identity Services
+- Mail: SMTP through Nodemailer, skipped when it is not configured
+- Hosting: Vercel, with the interface and the API on the same domain
+- Scanning: the phone camera in the browser
 
-## تشغيل المشروع
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-الواجهة على `http://localhost:5173` والخادم على `http://127.0.0.1:8787`.
+The interface is at `http://localhost:5173`. The API is at `http://127.0.0.1:8787`.
 
-انسخ `.env.example` إلى `.env` واملأ القيم على جهازك. لا ترفع ملف `.env`.
+Copy `.env.example` to `.env` and fill in the values on your machine. Do not commit `.env`.
 
-| المتغير | الاستخدام |
+| Variable | Purpose |
 | --- | --- |
-| `VITE_GOOGLE_CLIENT_ID` | زر الدخول بحساب Google |
-| `SUPABASE_URL` | عنوان مشروع قاعدة البيانات |
-| `SUPABASE_SERVICE_ROLE_KEY` | مفتاح الخادم فقط |
-| `SMTP_USER` و `SMTP_PASS` | إرسال بريد البلاغ، اختياري |
-| `SMTP_HOST` و `SMTP_PORT` | الافتراضي Gmail على المنفذ 587 |
-| `APP_URL` | رابط الموقع داخل رسالة البريد |
+| `VITE_GOOGLE_CLIENT_ID` | Google sign-in button |
+| `SUPABASE_URL` | Database project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only database key |
+| `SMTP_USER` and `SMTP_PASS` | Optional report email |
+| `SMTP_HOST` and `SMTP_PORT` | Mail server, Gmail on port 587 by default |
+| `APP_URL` | Site link used inside a report email |
 
-لزر Google، أضف نطاق الموقع ضمن Authorized JavaScript origins في Google Cloud. محلياً: `http://localhost:5173`.
+For Google sign-in, add the site origin under Authorized JavaScript origins in Google Cloud. Locally that origin is `http://localhost:5173`.
 
 ```bash
 npm run build
 ```
 
-يبني الواجهة إلى `dist`. على Vercel يُوجَّه كل مسار `/api` إلى خادم Express.
-
-## التواصل
-
-نعمة حمد، غزة
-
-- البريد: [neamahamad2003@gmail.com](mailto:neamahamad2003@gmail.com)
-- واتساب: [+970597112357](https://wa.me/970597112357)
-- لينكدإن: [neama-hamad-9a3482392](https://www.linkedin.com/in/neama-hamad-9a3482392)
-
----
-
-## English
-
-CAR-SILA is a web platform that gives a car a digital identity without exposing the owner's phone number.
-
-A passerby scans a QR sticker, or types the plate, and sends a report. The owner receives it in the dashboard and by email. The two sides continue in a private thread. The public vehicle response contains only brand, model, year, color, plate, and status.
-
-Accounts, reports, and messages live in Supabase and are reached only through the Express API. Sessions are HttpOnly cookies. Google sign-in is available for owners. The administrator signs in with email and password. Secrets stay in `.env` and are never committed.
-
-```bash
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173`.
+The build writes the interface to `dist`. On Vercel, every `/api` path is routed to the Express server.
