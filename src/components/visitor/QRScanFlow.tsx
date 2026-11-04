@@ -76,6 +76,12 @@ export const QRScanFlow: React.FC = () => {
 
   const plate = activeScanVehicle?.plateNumber || '';
   const conversation = conversations.find((item) => item.id === activeConversationId);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (step !== 'success') return;
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation?.messages.length, step]);
 
   const reasons: {
     category: ReportCategory;
@@ -472,6 +478,7 @@ export const QRScanFlow: React.FC = () => {
                     {message.text}
                   </div>
                 ))}
+                <div ref={chatEndRef} />
               </div>
               <form
                 className="flex gap-2"

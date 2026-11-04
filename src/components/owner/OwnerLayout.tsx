@@ -38,7 +38,8 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
     setTheme,
     t,
     setAddVehicleModalOpen,
-    setActiveScanVehicle
+    setActiveScanVehicle,
+    setActiveConversationId
   } = useApp();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -124,7 +125,10 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id)}
+                onClick={() => {
+                  if (item.id === 'messages') setActiveConversationId(null);
+                  setCurrentView(item.id);
+                }}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl transition-all cursor-pointer ${
                   isActive
                     ? 'bg-cyan-600 text-white shadow-md shadow-cyan-700/40'
@@ -264,6 +268,7 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
                   key={item.id}
                   type="button"
                   onClick={() => {
+                    if (item.id === 'messages') setActiveConversationId(null);
                     setCurrentView(item.id);
                     setMenuOpen(false);
                   }}

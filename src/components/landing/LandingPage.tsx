@@ -100,18 +100,18 @@ export const LandingPage: React.FC = () => {
       theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'
     } overflow-hidden`}>
       {/* HERO SECTION (Screen 1 - Matching Exact Reference Mockup) */}
-      <section className={`relative min-h-0 sm:min-h-[90vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-20 transition-colors ${
+      <section className={`relative min-h-0 sm:min-h-[90vh] flex items-start sm:items-center justify-center px-4 sm:px-6 lg:px-8 pt-[340px] pb-8 sm:py-12 lg:py-20 transition-colors ${
         theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-slate-900 text-white'
       }`}>
         {/* Dark Ambient Background with Sleek Dark Sedan Rear View */}
-        <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none">
+        <div className="absolute inset-x-0 top-0 z-0 h-80 overflow-hidden select-none pointer-events-none sm:inset-0 sm:h-auto">
           <img
             src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=2000&auto=format&fit=crop&q=85"
             alt="Dark Luxury Car Rear"
-            className="w-full h-full object-cover object-right-bottom lg:object-center scale-105"
+            className="h-full w-full object-cover object-[28%_center] sm:object-right-bottom sm:scale-105 lg:object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/35 to-transparent"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/25 via-transparent to-slate-950/30 sm:from-slate-950/80 sm:via-slate-950/35 sm:to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/20 sm:from-slate-950/70 sm:to-slate-950/25"></div>
         </div>
 
         {/* Hero Content Container */}
@@ -202,97 +202,105 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 4 FEATURE HIGHLIGHTS (Exact Bottom Row from Reference Mockup) */}
-      <section className={`border-t py-12 px-4 sm:px-6 lg:px-8 transition-colors ${
+      <section className={`border-t py-8 px-4 sm:px-6 md:py-12 lg:px-8 transition-colors ${
         theme === 'dark' 
           ? 'border-slate-900/90 bg-slate-950' 
           : 'border-slate-200 bg-white'
       }`}>
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
           {/* Card 1: Instant Notifications */}
-          <div className={`flex flex-col items-start p-6 rounded-2xl border transition-all text-start ${
+          <div className={`flex flex-row items-center gap-3 p-4 md:flex-col md:items-start md:gap-0 md:p-6 rounded-2xl border transition-all text-start ${
             theme === 'dark' 
               ? 'bg-slate-950 border-slate-800/80 hover:border-slate-700 text-white' 
               : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-md text-slate-900'
           }`}>
-            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-4 text-cyan-400 shadow-sm ${
+            <div className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center md:mb-4 md:h-12 md:w-12 text-cyan-400 shadow-sm ${
               theme === 'dark' ? 'bg-slate-900 border-slate-700/70' : 'bg-white border-slate-200'
             }`}>
               <Bell className="w-6 h-6" />
             </div>
-            <h3 className={`font-bold text-base mb-1.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {t('instantNotifications')}
-            </h3>
-            <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              {t('instantNotificationsDesc')}
-            </p>
+            <div className="min-w-0">
+              <h3 className={`font-bold text-sm md:text-base mb-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {t('instantNotifications')}
+              </h3>
+              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {t('instantNotificationsDesc')}
+              </p>
+            </div>
           </div>
 
           {/* Card 2: Anonymous Communication */}
-          <div className={`flex flex-col items-start p-6 rounded-2xl border transition-all text-start ${
+          <div className={`flex flex-row items-center gap-3 p-4 md:flex-col md:items-start md:gap-0 md:p-6 rounded-2xl border transition-all text-start ${
             theme === 'dark' 
               ? 'bg-slate-950 border-slate-800/80 hover:border-slate-700 text-white' 
               : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-md text-slate-900'
           }`}>
-            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-4 text-cyan-400 shadow-sm ${
+            <div className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center md:mb-4 md:h-12 md:w-12 text-cyan-400 shadow-sm ${
               theme === 'dark' ? 'bg-slate-900 border-slate-700/70' : 'bg-white border-slate-200'
             }`}>
               <MessageSquare className="w-6 h-6" />
             </div>
-            <h3 className={`font-bold text-base mb-1.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {t('anonymousCommunication')}
-            </h3>
-            <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              {t('anonymousCommunicationDesc')}
-            </p>
+            <div className="min-w-0">
+              <h3 className={`font-bold text-sm md:text-base mb-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {t('anonymousCommunication')}
+              </h3>
+              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {t('anonymousCommunicationDesc')}
+              </p>
+            </div>
           </div>
 
           {/* Card 3: Smart Reports */}
-          <div className={`flex flex-col items-start p-6 rounded-2xl border transition-all text-start ${
+          <div className={`flex flex-row items-center gap-3 p-4 md:flex-col md:items-start md:gap-0 md:p-6 rounded-2xl border transition-all text-start ${
             theme === 'dark' 
               ? 'bg-slate-950 border-slate-800/80 hover:border-slate-700 text-white' 
               : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-md text-slate-900'
           }`}>
-            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-4 text-cyan-400 shadow-sm ${
+            <div className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center md:mb-4 md:h-12 md:w-12 text-cyan-400 shadow-sm ${
               theme === 'dark' ? 'bg-slate-900 border-slate-700/70' : 'bg-white border-slate-200'
             }`}>
               <LayoutGrid className="w-6 h-6" />
             </div>
-            <h3 className={`font-bold text-base mb-1.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {t('smartReports')}
-            </h3>
-            <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              {t('smartReportsDesc')}
-            </p>
+            <div className="min-w-0">
+              <h3 className={`font-bold text-sm md:text-base mb-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {t('smartReports')}
+              </h3>
+              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {t('smartReportsDesc')}
+              </p>
+            </div>
           </div>
 
           {/* Card 4: Privacy First */}
-          <div className={`flex flex-col items-start p-6 rounded-2xl border transition-all text-start ${
+          <div className={`flex flex-row items-center gap-3 p-4 md:flex-col md:items-start md:gap-0 md:p-6 rounded-2xl border transition-all text-start ${
             theme === 'dark' 
               ? 'bg-slate-950 border-slate-800/80 hover:border-slate-700 text-white' 
               : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-md text-slate-900'
           }`}>
-            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-4 text-cyan-400 shadow-sm ${
+            <div className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center md:mb-4 md:h-12 md:w-12 text-cyan-400 shadow-sm ${
               theme === 'dark' ? 'bg-slate-900 border-slate-700/70' : 'bg-white border-slate-200'
             }`}>
               <Lock className="w-6 h-6" />
             </div>
-            <h3 className={`font-bold text-base mb-1.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {t('privacyFirst')}
-            </h3>
-            <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              {t('privacyFirstDesc')}
-            </p>
+            <div className="min-w-0">
+              <h3 className={`font-bold text-sm md:text-base mb-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {t('privacyFirst')}
+              </h3>
+              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {t('privacyFirstDesc')}
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* HOW IT WORKS SECTION (Screen 2) */}
-      <section id="how-it-works-section" className={`py-12 sm:py-20 px-4 sm:px-6 lg:px-8 transition-colors ${
+      <section id="how-it-works-section" className={`py-8 md:py-20 px-4 sm:px-6 lg:px-8 transition-colors ${
         theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'
       }`}>
-        <div className="max-w-7xl mx-auto text-center space-y-12">
+        <div className="max-w-7xl mx-auto text-center space-y-6 md:space-y-12">
           <div>
-            <h2 className={`text-2xl sm:text-4xl font-extrabold tracking-tight ${
+            <h2 className={`text-2xl md:text-4xl font-extrabold tracking-tight ${
               theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
               {t('howItWorks')}
@@ -305,85 +313,93 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* 4 Step Numbered Cards (Screen 2 exact cards) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             {/* Step 01 */}
-            <div className={`flex flex-col items-center p-5 sm:p-8 rounded-3xl border transition-all text-center ${
+            <div className={`flex flex-row items-center gap-3 p-4 text-start md:flex-col md:gap-0 md:p-8 md:text-center rounded-3xl border transition-all ${
               theme === 'dark'
                 ? 'bg-slate-950 border-slate-800 hover:border-cyan-400/50 hover:shadow-xl'
                 : 'bg-slate-50 border-slate-200/80 hover:shadow-xl hover:border-cyan-300'
             }`}>
-              <div className="w-14 h-14 rounded-2xl bg-cyan-500/15 text-cyan-600 flex items-center justify-center mb-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-600 md:mb-6 md:h-14 md:w-14">
                 <UserPlus className="w-7 h-7" />
               </div>
-              <span className="text-2xl sm:text-3xl font-extrabold text-cyan-500 tracking-tight mb-2">
-                01
-              </span>
-              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {t('step1Title')}
-              </h3>
-              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t('step1Desc')}
-              </p>
+              <div className="min-w-0 md:w-full">
+                <span className="text-xl font-extrabold text-cyan-500 tracking-tight md:mb-2 md:block md:text-3xl">
+                  01
+                </span>
+                <h3 className={`text-base font-bold md:mb-2 md:text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {t('step1Title')}
+                </h3>
+                <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('step1Desc')}
+                </p>
+              </div>
             </div>
 
             {/* Step 02 */}
-            <div className={`flex flex-col items-center p-5 sm:p-8 rounded-3xl border transition-all text-center ${
+            <div className={`flex flex-row items-center gap-3 p-4 text-start md:flex-col md:gap-0 md:p-8 md:text-center rounded-3xl border transition-all ${
               theme === 'dark'
                 ? 'bg-slate-950 border-slate-800 hover:border-cyan-400/50 hover:shadow-xl'
                 : 'bg-slate-50 border-slate-200/80 hover:shadow-xl hover:border-cyan-300'
             }`}>
-              <div className="w-14 h-14 rounded-2xl bg-cyan-500/15 text-cyan-600 flex items-center justify-center mb-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-600 md:mb-6 md:h-14 md:w-14">
                 <QrCode className="w-7 h-7" />
               </div>
-              <span className="text-2xl sm:text-3xl font-extrabold text-cyan-500 tracking-tight mb-2">
-                02
-              </span>
-              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {t('step2Title')}
-              </h3>
-              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t('step2Desc')}
-              </p>
+              <div className="min-w-0 md:w-full">
+                <span className="text-xl font-extrabold text-cyan-500 tracking-tight md:mb-2 md:block md:text-3xl">
+                  02
+                </span>
+                <h3 className={`text-base font-bold md:mb-2 md:text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {t('step2Title')}
+                </h3>
+                <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('step2Desc')}
+                </p>
+              </div>
             </div>
 
             {/* Step 03 */}
-            <div className={`flex flex-col items-center p-5 sm:p-8 rounded-3xl border transition-all text-center ${
+            <div className={`flex flex-row items-center gap-3 p-4 text-start md:flex-col md:gap-0 md:p-8 md:text-center rounded-3xl border transition-all ${
               theme === 'dark'
                 ? 'bg-slate-950 border-slate-800 hover:border-cyan-400/50 hover:shadow-xl'
                 : 'bg-slate-50 border-slate-200/80 hover:shadow-xl hover:border-cyan-300'
             }`}>
-              <div className="w-14 h-14 rounded-2xl bg-cyan-500/15 text-cyan-600 flex items-center justify-center mb-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-600 md:mb-6 md:h-14 md:w-14">
                 <Car className="w-7 h-7" />
               </div>
-              <span className="text-2xl sm:text-3xl font-extrabold text-cyan-500 tracking-tight mb-2">
-                03
-              </span>
-              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {t('step3Title')}
-              </h3>
-              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t('step3Desc')}
-              </p>
+              <div className="min-w-0 md:w-full">
+                <span className="text-xl font-extrabold text-cyan-500 tracking-tight md:mb-2 md:block md:text-3xl">
+                  03
+                </span>
+                <h3 className={`text-base font-bold md:mb-2 md:text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {t('step3Title')}
+                </h3>
+                <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('step3Desc')}
+                </p>
+              </div>
             </div>
 
             {/* Step 04 */}
-            <div className={`flex flex-col items-center p-5 sm:p-8 rounded-3xl border transition-all text-center ${
+            <div className={`flex flex-row items-center gap-3 p-4 text-start md:flex-col md:gap-0 md:p-8 md:text-center rounded-3xl border transition-all ${
               theme === 'dark'
                 ? 'bg-slate-950 border-slate-800 hover:border-cyan-400/50 hover:shadow-xl'
                 : 'bg-slate-50 border-slate-200/80 hover:shadow-xl hover:border-cyan-300'
             }`}>
-              <div className="w-14 h-14 rounded-2xl bg-cyan-500/15 text-cyan-600 flex items-center justify-center mb-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-600 md:mb-6 md:h-14 md:w-14">
                 <Bell className="w-7 h-7" />
               </div>
-              <span className="text-2xl sm:text-3xl font-extrabold text-cyan-500 tracking-tight mb-2">
-                04
-              </span>
-              <h3 className={`text-lg font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {t('step4Title')}
-              </h3>
-              <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t('step4Desc')}
-              </p>
+              <div className="min-w-0 md:w-full">
+                <span className="text-xl font-extrabold text-cyan-500 tracking-tight md:mb-2 md:block md:text-3xl">
+                  04
+                </span>
+                <h3 className={`text-base font-bold md:mb-2 md:text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {t('step4Title')}
+                </h3>
+                <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('step4Desc')}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -401,16 +417,16 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* FEATURES DEEP-DIVE SECTION (id="features-section") */}
-      <section id="features-section" className={`py-12 sm:py-20 px-4 sm:px-6 lg:px-8 border-t transition-colors ${
+      <section id="features-section" className={`py-8 md:py-20 px-4 sm:px-6 lg:px-8 border-t transition-colors ${
         theme === 'dark' ? 'bg-slate-950 border-slate-900 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
       }`}>
-        <div className="max-w-7xl mx-auto space-y-16">
+        <div className="max-w-7xl mx-auto space-y-8 md:space-y-16">
           <div className="text-center max-w-3xl mx-auto space-y-3">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold">
               <Sparkles className="w-3.5 h-3.5" />
               <span>{language === 'ar' ? 'مميزات منصة CAR-SILA' : 'Powerful Core Capabilities'}</span>
             </div>
-            <h2 className="text-2xl sm:text-4xl font-black tracking-tight">
+            <h2 className="text-2xl md:text-4xl font-black tracking-tight">
               {language === 'ar' ? 'حلول ذكية مصممة لحماية خصوصيتك وسهولة التواصل' : 'Smart Solutions Designed for Privacy & Connectivity'}
             </h2>
             <p className={`text-sm sm:text-base ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -420,15 +436,15 @@ export const LandingPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8">
             {/* Feature 1 */}
-            <div className={`p-7 rounded-3xl border transition-all ${
+            <div className={`p-4 md:p-7 rounded-3xl border transition-all ${
               theme === 'dark' ? 'bg-slate-900/70 border-slate-800 hover:border-cyan-400/50' : 'bg-white border-slate-200 hover:border-cyan-300 hover:shadow-lg'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 shrink-0 rounded-2xl md:h-12 md:w-12 bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 flex items-center justify-center mb-3 md:mb-5">
                 <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2">
+              <h3 className="text-base font-bold mb-1.5 md:mb-2 md:text-lg">
                 {language === 'ar' ? 'إخفاء رقم الهاتف بنسبة 100%' : '100% Phone Number Shield'}
               </h3>
               <p className={`text-xs sm:text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -439,13 +455,13 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Feature 2 */}
-            <div className={`p-7 rounded-3xl border transition-all ${
+            <div className={`p-4 md:p-7 rounded-3xl border transition-all ${
               theme === 'dark' ? 'bg-slate-900/70 border-slate-800 hover:border-cyan-400/50' : 'bg-white border-slate-200 hover:border-cyan-300 hover:shadow-lg'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 shrink-0 rounded-2xl md:h-12 md:w-12 bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center mb-3 md:mb-5">
                 <Zap className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2">
+              <h3 className="text-base font-bold mb-1.5 md:mb-2 md:text-lg">
                 {language === 'ar' ? 'بلاغات سريعة بضغطة زر' : 'Instant One-Tap Reports'}
               </h3>
               <p className={`text-xs sm:text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -456,13 +472,13 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Feature 3 */}
-            <div className={`p-7 rounded-3xl border transition-all ${
+            <div className={`p-4 md:p-7 rounded-3xl border transition-all ${
               theme === 'dark' ? 'bg-slate-900/70 border-slate-800 hover:border-cyan-400/50' : 'bg-white border-slate-200 hover:border-cyan-300 hover:shadow-lg'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-amber-600/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 shrink-0 rounded-2xl md:h-12 md:w-12 bg-amber-600/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-3 md:mb-5">
                 <MessageCircle className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2">
+              <h3 className="text-base font-bold mb-1.5 md:mb-2 md:text-lg">
                 {language === 'ar' ? 'محادثة مباشرة مشفرة' : 'Encrypted Live Chat'}
               </h3>
               <p className={`text-xs sm:text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -473,13 +489,13 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Feature 4 */}
-            <div className={`p-7 rounded-3xl border transition-all ${
+            <div className={`p-4 md:p-7 rounded-3xl border transition-all ${
               theme === 'dark' ? 'bg-slate-900/70 border-slate-800 hover:border-cyan-400/50' : 'bg-white border-slate-200 hover:border-cyan-300 hover:shadow-lg'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-purple-600/10 border border-purple-500/20 text-purple-500 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 shrink-0 rounded-2xl md:h-12 md:w-12 bg-purple-600/10 border border-purple-500/20 text-purple-500 flex items-center justify-center mb-3 md:mb-5">
                 <QrCode className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2">
+              <h3 className="text-base font-bold mb-1.5 md:mb-2 md:text-lg">
                 {language === 'ar' ? 'ملصقات QR عالية الدقة' : 'Ultra-HD Weatherproof QR'}
               </h3>
               <p className={`text-xs sm:text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -490,13 +506,13 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Feature 5 */}
-            <div className={`p-7 rounded-3xl border transition-all ${
+            <div className={`p-4 md:p-7 rounded-3xl border transition-all ${
               theme === 'dark' ? 'bg-slate-900/70 border-slate-800 hover:border-cyan-400/50' : 'bg-white border-slate-200 hover:border-cyan-300 hover:shadow-lg'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-sky-600/10 border border-sky-500/20 text-sky-500 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 shrink-0 rounded-2xl md:h-12 md:w-12 bg-sky-600/10 border border-sky-500/20 text-sky-500 flex items-center justify-center mb-3 md:mb-5">
                 <Car className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2">
+              <h3 className="text-base font-bold mb-1.5 md:mb-2 md:text-lg">
                 {language === 'ar' ? 'إدارة أسطول وسيارات متعددة' : 'Multi-Vehicle Fleet Manager'}
               </h3>
               <p className={`text-xs sm:text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -507,13 +523,13 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Feature 6 */}
-            <div className={`p-7 rounded-3xl border transition-all ${
+            <div className={`p-4 md:p-7 rounded-3xl border transition-all ${
               theme === 'dark' ? 'bg-slate-900/70 border-slate-800 hover:border-cyan-400/50' : 'bg-white border-slate-200 hover:border-cyan-300 hover:shadow-lg'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-rose-600/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 shrink-0 rounded-2xl md:h-12 md:w-12 bg-rose-600/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mb-3 md:mb-5">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold mb-2">
+              <h3 className="text-base font-bold mb-1.5 md:mb-2 md:text-lg">
                 {language === 'ar' ? 'بدون تطبيقات أو تعقيد' : 'Zero App Installation Needed'}
               </h3>
               <p className={`text-xs sm:text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>

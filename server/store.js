@@ -222,6 +222,7 @@ const withMessages = async (rows) => {
 
 const presentConversation = (conversation, audience, vehicle, ownerName) => ({
   ...conversation,
+  side: audience === 'visitor' ? 'reporter' : 'owner',
   vehicleId: audience === 'visitor' ? (vehicle?.qrToken || '') : conversation.vehicleId,
   reporterSessionId: '',
   messages: conversation.messages.map((message) => ({
@@ -298,17 +299,27 @@ export const workspaceFor = async (account, visitId) => {
 
   const vehicleRows = must(await supabase().from('vehicles').select('*').eq('owner_id', account.id)).map(vehicleFrom);
   const ids = vehicleRows.map((item) => item.id);
-  const [reports, conversationRows, notifications, activities] = await Promise.all([
+  const [reports, ownedConversationRows, notifications, activities, visitConversationRows] = await Promise.all([
     ids.length ? supabase().from('reports').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] }),
     ids.length ? supabase().from('conversations').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] }),
     supabase().from('notifications').select('*').eq('user_id', account.id),
-    ids.length ? supabase().from('activities').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] })
+    ids.length ? supabase().from('activities').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] }),
+    visitId
+      ? supabase().from('conversations').select('*').eq('reporter_session_id', visitId)
+      : Promise.resolve({ data: [] })
   ]);
+  const ownedRows = must(ownedConversationRows);
+  const ownedIds = new Set(ownedRows.map((row) => row.id));
+  const reporterRows = must(visitConversationRows).filter((row) => !ownedIds.has(row.id));
+  const conversations = [
+    ...(await decorate(await withMessages(ownedRows), 'owner')),
+    ...(await decorate(await withMessages(reporterRows), 'visitor'))
+  ];
   return {
     user: publicUser(account, vehicleRows.length),
     vehicles: vehicleRows,
     reports: must(reports).map(reportFrom),
-    conversations: await decorate(await withMessages(must(conversationRows)), 'owner'),
+    conversations,
     notifications: must(notifications).map(notificationFrom),
     activities: must(activities).map(activityFrom),
     users: []
@@ -589,7 +600,7 @@ export const submitReport = async (visitId, input, account) => {
       await sendReportEmail({
         to: owner.email,
         ownerName: owner.name,
-        reporterLabel,
+        reporterLabel: reporterName,
         vehicle,
         title,
         description
@@ -760,13 +771,17 @@ export const loginGoogleAccount = async ({ email, name }) => {
   return { account };
 };
 
-export const markOwnerConversationsRead = async (account) => {
+export const markOwnerConversationsRead = async (account, conversationId) => {
   if (!account || account.role === 'admin') return { error: 'forbidden' };
   const vehicles = must(await supabase().from('vehicles').select('id').eq('owner_id', account.id)) || [];
   const vehicleIds = vehicles.map((row) => row.id);
   if (!vehicleIds.length) return { ok: true };
   const conversations = must(await supabase().from('conversations').select('id').in('vehicle_id', vehicleIds)) || [];
-  const ids = conversations.map((row) => row.id);
+  let ids = conversations.map((row) => row.id);
+  if (conversationId) {
+    if (!ids.includes(conversationId)) return { error: 'forbidden' };
+    ids = [conversationId];
+  }
   if (!ids.length) return { ok: true };
   must(await supabase().from('conversations').update({ unread_count: 0 }).in('id', ids));
   must(await supabase().from('messages').update({ is_read: true }).in('conversation_id', ids));

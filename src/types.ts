@@ -115,6 +115,7 @@ export interface Conversation {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  side?: 'owner' | 'reporter';
   reporterSessionId: string;
   status: 'open' | 'closed';
   messages: ChatMessage[];

@@ -29,6 +29,11 @@ interface Toast {
   type: 'success' | 'info' | 'warning' | 'error';
 }
 
+interface Ping {
+  id: string;
+  message: string;
+}
+
 interface AppContextType {
   // Navigation & View
   currentView: AppView;
@@ -92,7 +97,7 @@ interface AppContextType {
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
   sendMessage: (conversationId: string, text: string, senderRole: 'owner' | 'reporter') => void;
-  markMessagesRead: () => void;
+  markMessagesRead: (conversationId: string) => void;
 
   // Notifications & Activity
   notifications: AppNotification[];
@@ -104,6 +109,7 @@ interface AppContextType {
   // Toasts
   toasts: Toast[];
   showToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  pings: Ping[];
 
   // Modals
   qrModalVehicle: Vehicle | null;
@@ -176,6 +182,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [pings, setPings] = useState<Ping[]>([]);
+  const heardRef = useRef<{ notices: Set<string>; messages: Set<string> } | null>(null);
+  const audioRef = useRef<AudioContext | null>(null);
+  const languageRef = useRef(language);
+  languageRef.current = language;
 
   // Update HTML dir and lang on language change
   const setLanguage = (lang: Language) => {
@@ -262,7 +273,80 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, 4000);
   };
 
+  const playTick = () => {
+    const ctx = audioRef.current;
+    if (!ctx) return;
+    ctx.resume().then(() => {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1480, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.06, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    }).catch(() => undefined);
+  };
+
+  const showPing = (message: string) => {
+    const id = `ping_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setPings((prev) => [...prev.slice(-1), { id, message }]);
+    playTick();
+    window.setTimeout(() => {
+      setPings((prev) => prev.filter((item) => item.id !== id));
+    }, 2800);
+  };
+
+  const noticeArrivals = (data: Workspace) => {
+    const stripMail = (value: string) => value
+      .replace(/\s*\([^)]*@[^)]*\)/g, '')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const incomingIds: string[] = [];
+    const incomingText = new Map<string, string>();
+    for (const conversation of data.conversations) {
+      for (const message of conversation.messages) {
+        const incoming = conversation.side === 'reporter'
+          ? message.senderRole === 'owner'
+          : message.senderRole === 'reporter';
+        if (!incoming) continue;
+        incomingIds.push(message.id);
+        incomingText.set(message.id, message.text);
+      }
+    }
+    const noticeIds = data.notifications.map((item) => item.id);
+    if (!heardRef.current) {
+      heardRef.current = { notices: new Set(noticeIds), messages: new Set(incomingIds) };
+      return;
+    }
+    const freshNotices = data.notifications.filter((item) => !heardRef.current?.notices.has(item.id) && !item.isRead);
+    const freshMessages = incomingIds.filter((id) => !heardRef.current?.messages.has(id));
+    heardRef.current = { notices: new Set(noticeIds), messages: new Set(incomingIds) };
+    const arabic = languageRef.current === 'ar';
+    if (freshNotices.length) {
+      const item = freshNotices[freshNotices.length - 1];
+      const title = item.type === 'chat_message'
+        ? (arabic ? 'رسالة جديدة' : 'New message')
+        : (arabic ? 'بلاغ جديد' : 'New report');
+      const detail = stripMail(item.message || '').slice(0, 80);
+      showPing(detail ? `${title}: ${detail}` : title);
+      return;
+    }
+    if (freshMessages.length) {
+      const detail = stripMail(incomingText.get(freshMessages[freshMessages.length - 1]) || '').slice(0, 80);
+      showPing(detail
+        ? (arabic ? `رسالة جديدة: ${detail}` : `New message: ${detail}`)
+        : (arabic ? 'رسالة جديدة' : 'New message'));
+    }
+  };
+
   const applyWorkspace = (data: Workspace) => {
+    noticeArrivals(data);
     setCurrentUser(data.user);
     setVehicles(data.vehicles);
     setReports(data.reports);
@@ -310,6 +394,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   useEffect(() => {
+    const unlock = () => {
+      const Context = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Context) return;
+      if (!audioRef.current) audioRef.current = new Context();
+      audioRef.current.resume().catch(() => undefined);
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  useEffect(() => {
     localStorage.removeItem('carsila_db');
     localStorage.removeItem('carsila_session');
     localStorage.removeItem('carsila_auth_user');
@@ -322,12 +421,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .catch(() => undefined);
     };
     load();
-    const timer = window.setInterval(load, 20000);
+    const liveChat = currentView === 'messages' || currentView === 'qr-scan-flow';
+    const timer = window.setInterval(load, liveChat ? 4000 : 6000);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [currentView]);
 
   useEffect(() => {
     localStorage.setItem(VIEW_KEY, currentView);
@@ -590,7 +690,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ? reports.filter((report) => ownerVehicleIds.has(report.vehicleId))
     : reports;
   const visibleConversations = currentUser?.role === 'owner'
-    ? conversations.filter((conversation) => ownerVehicleIds.has(conversation.vehicleId))
+    ? conversations.filter((conversation) =>
+        conversation.side === 'reporter' || ownerVehicleIds.has(conversation.vehicleId))
     : conversations;
   const visibleNotifications = currentUser?.role === 'admin'
     ? notifications
@@ -628,8 +729,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const markMessagesRead = () => {
-    api<Workspace>('/api/messages/read', {}).then(applyWorkspace).catch(() => undefined);
+  const markMessagesRead = (conversationId: string) => {
+    api<Workspace>('/api/messages/read', { conversationId }).then(applyWorkspace).catch(() => undefined);
   };
 
   const unreadNotifsCount = visibleNotifications.filter((n) => !n.isRead).length;
@@ -713,6 +814,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         toasts,
         showToast,
+        pings,
 
         qrModalVehicle,
         setQrModalVehicle,

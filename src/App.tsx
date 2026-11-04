@@ -30,7 +30,7 @@ import { AdminReportsView } from './components/admin/AdminReportsView';
 import { AdminSecurityView } from './components/admin/AdminSecurityView';
 
 const AppContent: React.FC = () => {
-  const { currentView, toasts, language, theme } = useApp();
+  const { currentView, toasts, pings, language, theme } = useApp();
 
   const renderContent = () => {
     switch (currentView) {
@@ -181,6 +181,19 @@ const AppContent: React.FC = () => {
 
       {/* Global Add Vehicle Modal */}
       <AddVehicleModal />
+
+      {pings.length > 0 && (
+        <div className="fixed top-20 left-1/2 z-[60] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col gap-2">
+          {pings.map((ping) => (
+            <div
+              key={ping.id}
+              className="rounded-2xl border border-cyan-400/40 bg-[#041820]/95 px-4 py-3 text-sm font-bold text-white shadow-xl shadow-black/40"
+            >
+              {ping.message}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Global Notification Toasts */}
       {toasts.length > 0 && (

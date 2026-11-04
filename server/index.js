@@ -371,7 +371,7 @@ app.post('/api/messages/read', async (req, res) => {
   try {
     const account = await requireAccount(req, res);
     if (!account) return;
-    const result = await markOwnerConversationsRead(account);
+    const result = await markOwnerConversationsRead(account, req.body?.conversationId);
     if (result.error) return res.status(403).json({ error: result.error });
     await sendWorkspace(res, account, currentVisit(req));
   } catch (error) {
