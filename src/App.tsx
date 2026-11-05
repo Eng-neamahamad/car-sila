@@ -129,6 +129,9 @@ const AppContent: React.FC = () => {
         );
 
       // 5. Admin Portal (Screens 17 - 21)
+      case 'admin-login':
+        return <AdminLoginView />;
+
       case 'admin-overview':
         return (
           <AdminLayout>

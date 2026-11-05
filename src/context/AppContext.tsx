@@ -146,6 +146,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Navigation
   const [currentView, setViewState] = useState<AppView>(() => readSavedView(null));
   const pendingView = useRef(localStorage.getItem(VIEW_KEY));
+  const viewRef = useRef<AppView>(currentView);
+  viewRef.current = currentView;
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('carsila_language');
     return saved === 'ar' || saved === 'en' ? saved : 'ar';
@@ -253,6 +255,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       let token = '';
 
       if (hash.replace(/^#/, '') === 'admin') {
+        const view = viewRef.current;
+        if (view === 'login' || view === 'register') return;
         setViewState('admin-login');
         return;
       }
@@ -386,8 +390,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const pending = pendingView.current;
     pendingView.current = null;
     setViewState((view) => {
-      if (data.user?.role === 'admin' && pending && isAppView(pending) && isAdminView(pending)) return pending;
-      if (data.user?.role === 'admin' && view === 'admin-login') return 'admin-overview';
+      const signingIn = view === 'login' || view === 'register';
+      if (!signingIn && data.user?.role === 'admin' && pending && isAppView(pending) && isAdminView(pending)) return pending;
       if (!data.user && (isOwnerView(view) || isAdminView(view))) {
         return window.location.hash.replace(/^#/, '') === 'admin' ? 'admin-login' : 'landing';
       }
@@ -465,6 +469,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setCurrentView = (view: AppView) => {
     const role = currentUser?.role;
+    if (view === 'login' || view === 'register') {
+      pendingView.current = null;
+      if (window.location.hash.replace(/^#/, '') === 'admin') {
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      }
+    }
     if (view === 'admin-login') {
       setViewState(role === 'admin' ? 'admin-overview' : 'admin-login');
       return;
@@ -505,15 +515,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const login = (email: string, password: string) => {
+    pendingView.current = null;
     api<Workspace>('/api/auth/login', { email, password })
       .then(openSession)
-      .catch(explain);
+      .catch((error) => {
+        explain(error);
+        setViewState('login');
+      });
   };
 
   const loginWithGoogle = (credential: string) => {
+    pendingView.current = null;
     api<Workspace>('/api/auth/google', { credential })
       .then(openSession)
-      .catch(explain);
+      .catch((error) => {
+        explain(error);
+        setViewState((view) => (view === 'register' ? 'register' : 'login'));
+      });
   };
 
   const loginAdmin = (password: string) =>

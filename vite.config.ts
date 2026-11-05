@@ -34,10 +34,10 @@ export default defineConfig(() => {
           "frame-src https://accounts.google.com",
           "object-src 'none'",
           "base-uri 'self'",
-          "form-action 'self'"
+          "form-action 'self' https://accounts.google.com"
         ].join('; '),
         'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'no-referrer',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
         'X-Frame-Options': 'DENY'
       }
     },

@@ -35,8 +35,10 @@ export const AdminLoginView: React.FC = () => {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.16),transparent_42%)]" />
       <form
         onSubmit={submit}
+        autoComplete="off"
         className="relative w-full max-w-[420px] rounded-[28px] border border-cyan-400/25 bg-[#061820]/95 p-7 shadow-[0_0_80px_rgba(34,211,238,0.12)] sm:p-8"
       >
+        <input type="text" name="username" autoComplete="username" value="carsila-admin" readOnly tabIndex={-1} className="hidden" aria-hidden="true" />
         <div className="mb-6 text-center">
           <img src={logo} alt="" className="mx-auto h-16 w-auto object-contain" />
           <h1 className="mt-4 text-3xl font-black tracking-wide">CAR-SILA</h1>
@@ -54,7 +56,8 @@ export const AdminLoginView: React.FC = () => {
             type={visible ? 'text' : 'password'}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
+            name="admin-gate"
+            autoComplete="new-password"
             className="w-full rounded-xl border border-cyan-500/30 bg-[#0a2430] py-3 pe-12 ps-10 text-sm text-white outline-none focus:border-cyan-400"
           />
           <button

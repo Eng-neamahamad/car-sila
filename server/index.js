@@ -23,6 +23,7 @@ import {
   markNotification,
   markOwnerConversationsRead,
   publicVehicle,
+  recordFailedLogin,
   regenerateToken,
   registerAccount,
   sendMessage,

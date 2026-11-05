@@ -175,6 +175,7 @@ export const readSessionUser = (accounts: StoredAccount[]): User | null => {
 export const readSavedView = (user: User | null): AppView => {
   const saved = localStorage.getItem(VIEW_KEY);
   const view = isAppView(saved) ? saved : 'landing';
+  if (view === 'admin-login') return 'landing';
   if (isAdminView(view)) return user?.role === 'admin' ? view : 'landing';
   if (isOwnerView(view)) return user?.role === 'owner' ? view : 'landing';
   return view;

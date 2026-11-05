@@ -782,7 +782,6 @@ export const registerAccount = async ({ name, email, password, phone }) => {
     avatar: ''
   };
   await insertAccount(account);
-  return { account };
   try {
     await insertActivity({
       id: `act_${randomUUID()}`,
