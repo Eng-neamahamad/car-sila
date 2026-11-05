@@ -17,6 +17,7 @@ import {
   findVehicleByPublicCode,
   loadDatabase,
   loginAccount,
+  loginAdmin,
   loginGoogleAccount,
   markAllNotifications,
   markNotification,
@@ -30,8 +31,10 @@ import {
   updateProfile,
   updateReportStatus,
   updateVehicleStatus,
+  VISIT_MS,
   workspaceFor
 } from './store.js';
+import { sosAccept, sosClose, sosCreate, sosMessage, sosState, sosSummary, sosToggle } from './sos.js';
 
 const loadEnvFile = () => {
   try {
@@ -140,7 +143,9 @@ const fail = (res, error) => {
 
 app.get('/api/bootstrap', async (req, res) => {
   try {
-    await sendWorkspace(res, await currentAccount(req), currentVisit(req));
+    const visitId = await ensureVisit(currentVisit(req));
+    res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
+    await sendWorkspace(res, await currentAccount(req), visitId);
   } catch (error) {
     fail(res, error);
   }
@@ -159,9 +164,27 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
-    const result = await loginAccount(req.body?.email, req.body?.password);
-    if (result.error) return res.status(401).json({ error: result.error });
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const result = await loginAccount(email, req.body?.password);
+    if (result.error) {
+      if (result.error === 'invalid_credentials' || result.error === 'suspended') {
+        await recordFailedLogin(email === ADMIN_EMAIL ? 'admin' : result.error === 'suspended' ? 'suspended' : 'account');
+      }
+      return res.status(401).json({ error: result.error });
+    }
     await setSession(res, result.account);
+    await sendWorkspace(res, result.account, currentVisit(req));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/auth/admin', authLimiter, async (req, res) => {
+  try {
+    const result = await loginAdmin(req.body?.password);
+    if (result.error) return res.status(401).json({ error: result.error });
+    const eightHours = 8 * 60 * 60 * 1000;
+    res.cookie('carsila_sid', await createSession(result.account.id, eightHours), { ...cookieOptions, maxAge: eightHours });
     await sendWorkspace(res, result.account, currentVisit(req));
   } catch (error) {
     fail(res, error);
@@ -215,7 +238,7 @@ app.post('/api/public/reports', reportLimiter, async (req, res) => {
   try {
     const visitId = await ensureVisit(currentVisit(req));
     if (visitId !== currentVisit(req)) {
-      res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: 12 * 60 * 60 * 1000 });
+      res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
     }
     const result = await submitReport(visitId, req.body || {}, await currentAccount(req));
     if (result.error) return res.status(404).json({ error: result.error });
@@ -388,6 +411,92 @@ app.post('/api/notifications/read', async (req, res) => {
       : await markNotification(account, req.body?.id);
     if (result.error) return res.status(403).json({ error: result.error });
     await sendWorkspace(res, account, currentVisit(req));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+const sosStatus = (error) => ({
+  forbidden: 403,
+  suspended: 403,
+  invalid_input: 400,
+  sos_location: 400,
+  sos_open: 409,
+  sos_unavailable: 503,
+  sos_expired: 409,
+  not_found: 404
+}[error] || 400);
+
+const sendSos = (res, result) => {
+  if (result?.error) return res.status(sosStatus(result.error)).json({ error: result.error });
+  res.json(result);
+};
+
+app.get('/api/sos', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosState(account));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/sos/help', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosToggle(account, req.body || {}));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/sos/request', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosCreate(account, req.body || {}));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/sos/accept', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosAccept(account, req.body?.id));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/sos/close', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosClose(account, req.body?.id));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/sos/message', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosMessage(account, req.body?.id, req.body?.text));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.get('/api/sos/summary', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    sendSos(res, await sosSummary(account));
   } catch (error) {
     fail(res, error);
   }

@@ -17,6 +17,8 @@ export type Workspace = {
   notifications: AppNotification[];
   activities: ActivityEvent[];
   users: User[];
+  mailReady?: boolean;
+  visitors?: { total: number; week: number; points: number[] };
 };
 
 export type PublicVehicle = {

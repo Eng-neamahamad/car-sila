@@ -8,6 +8,7 @@ import {
   Bell,
   Activity as ActivityIcon,
   Settings,
+  LifeBuoy,
   LogOut,
   Globe,
   Plus,
@@ -54,7 +55,8 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
     { id: 'messages', label: t('messages'), icon: MessageSquare, badge: unreadMessages, badgeColor: 'bg-rose-500' },
     { id: 'notifications', label: t('notifications'), icon: Bell, badge: unreadNotifsCount, badgeColor: 'bg-rose-500' },
     { id: 'activity', label: t('activity'), icon: ActivityIcon },
-    { id: 'settings', label: t('settings'), icon: Settings }
+    { id: 'settings', label: t('settings'), icon: Settings },
+    { id: 'sos', label: t('sos'), icon: LifeBuoy }
   ];
 
   return (

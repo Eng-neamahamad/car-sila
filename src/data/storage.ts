@@ -36,7 +36,8 @@ const OWNER_VIEWS: AppView[] = [
   'messages',
   'notifications',
   'activity',
-  'settings'
+  'settings',
+  'sos'
 ];
 
 const ADMIN_VIEWS: AppView[] = [
@@ -56,6 +57,7 @@ const ALL_VIEWS: AppView[] = [
   'contact',
   'login',
   'register',
+  'admin-login',
   'qr-scan',
   'qr-scan-flow',
   'qr-report-form',

@@ -1,136 +1,84 @@
 import React, { useState } from 'react';
+import { Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import {
-  Users,
-  Search,
-  Filter,
-  UserPlus,
-  Shield,
-  Car,
-  MoreVertical,
-  CheckCircle2,
-  XCircle,
-  Mail
-} from 'lucide-react';
+import { formatWhen, statusLabel } from './labels';
 
 export const AdminUsersView: React.FC = () => {
-  const { users, t, language, showToast } = useApp();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'owner' | 'admin'>('all');
-
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  const { users, language, toggleUserStatus } = useApp();
+  const [search, setSearch] = useState('');
+  const arabic = language === 'ar';
+  const owners = users.filter((user) => user.role === 'owner');
+  const query = search.trim().toLowerCase();
+  const visible = owners.filter((user) =>
+    !query || user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query)
+  );
 
   return (
-    <div className="space-y-6 animate-fadeIn text-start text-slate-100">
-      {/* Header (Screen 18 top) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 text-start text-white">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-            {t('adminUsers')}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
-            {language === 'ar' ? 'إدارة حسابات المستخدمين وصلاحياتهم ومركباتهم المسجلة.' : 'Manage all registered owners, admins, and scanner accounts.'}
+          <h1 className="text-xl font-black sm:text-3xl">{arabic ? 'الحسابات' : 'Accounts'}</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            {arabic
+              ? 'إيقاف الحساب يمنع دخوله ولا يحذف سياراته.'
+              : 'Suspending an account blocks sign-in and keeps its vehicles.'}
           </p>
         </div>
-
-        <button
-          onClick={() => showToast(language === 'ar' ? 'نموذج إضافة مستخدم جاهز' : 'Add user dialog opened', 'info')}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>{language === 'ar' ? 'إضافة مستخدم' : 'Add New User'}</span>
-        </button>
-      </div>
-
-      {/* SEARCH & FILTERS BAR */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 rtl:left-auto rtl:right-3.5 top-1/2 -translate-y-1/2" />
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={language === 'ar' ? 'بحث بالاسم أو البريد الإلكتروني...' : 'Search by name or email...'}
-            className="w-full pl-10 rtl:pl-4 rtl:pr-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={arabic ? 'بحث بالاسم أو البريد' : 'Search by name or email'}
+            className="w-full rounded-xl border border-cyan-500/20 bg-[#0a2430] py-2.5 pe-3 ps-10 text-sm outline-none focus:border-cyan-400"
           />
         </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as any)}
-            className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none"
-          >
-            <option value="all">{language === 'ar' ? 'كل الأدوار (All Roles)' : 'All Roles'}</option>
-            <option value="owner">{language === 'ar' ? 'أصحاب سيارات (Owners)' : 'Vehicle Owners'}</option>
-            <option value="admin">{language === 'ar' ? 'مسؤولين (Admins)' : 'Admins'}</option>
-          </select>
-        </div>
       </div>
 
-      {/* USERS TABLE (Screen 18) */}
-      <div className="bg-slate-800/80 rounded-3xl border border-slate-700 shadow-lg overflow-hidden">
+      <div className="overflow-hidden rounded-3xl border border-cyan-500/15 bg-[#061820]">
         <div className="overflow-x-auto">
-          <table className="w-full text-left rtl:text-right text-xs">
-            <thead className="text-[10px] text-slate-400 uppercase bg-slate-900/80">
+          <table className="w-full min-w-[720px] text-start text-sm">
+            <thead className="bg-[#041018] text-xs text-slate-400">
               <tr>
-                <th className="px-5 py-4">User</th>
-                <th className="px-5 py-4">Role</th>
-                <th className="px-5 py-4">Vehicles</th>
-                <th className="px-5 py-4">Joined Date</th>
-                <th className="px-5 py-4">Status</th>
-                <th className="px-5 py-4 text-end">Actions</th>
+                <th className="px-4 py-3 font-bold">{arabic ? 'الاسم' : 'Name'}</th>
+                <th className="px-4 py-3 font-bold">{arabic ? 'البريد' : 'Email'}</th>
+                <th className="px-4 py-3 font-bold">{arabic ? 'السيارات' : 'Vehicles'}</th>
+                <th className="px-4 py-3 font-bold">{arabic ? 'تاريخ التسجيل' : 'Joined'}</th>
+                <th className="px-4 py-3 font-bold">{arabic ? 'الحالة' : 'Status'}</th>
+                <th className="px-4 py-3 text-end font-bold">{arabic ? 'إجراء' : 'Action'}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-purple-950 border border-purple-800 flex items-center justify-center font-bold text-purple-300 text-xs">
-                        {u.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <h4 className="font-extrabold text-white text-xs">{u.name}</h4>
-                        <p className="text-[11px] text-slate-400 font-mono">{u.email}</p>
-                      </div>
-                    </div>
+            <tbody className="divide-y divide-cyan-500/10">
+              {visible.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                    {arabic ? 'لا توجد حسابات مطابقة.' : 'No matching accounts.'}
                   </td>
-                  <td className="px-5 py-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      u.role === 'admin'
-                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                        : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                </tr>
+              ) : visible.map((user) => (
+                <tr key={user.id}>
+                  <td className="px-4 py-3 font-bold">{user.name}</td>
+                  <td className="px-4 py-3 text-slate-300">{user.email}</td>
+                  <td className="px-4 py-3">{user.vehiclesCount}</td>
+                  <td className="px-4 py-3 text-slate-300">{formatWhen(user.createdAt, arabic)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      user.status === 'inactive'
+                        ? 'bg-rose-500/15 text-rose-300'
+                        : 'bg-cyan-500/15 text-cyan-200'
                     }`}>
-                      {u.role.toUpperCase()}
+                      {statusLabel(user.status, arabic)}
                     </span>
                   </td>
-                  <td className="px-5 py-4 font-bold text-slate-300">
-                    <span className="flex items-center gap-1.5">
-                      <Car className="w-3.5 h-3.5 text-slate-500" />
-                      {u.vehiclesCount}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-slate-400">
-                    {u.createdAt}
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      ACTIVE
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-end">
+                  <td className="px-4 py-3 text-end">
                     <button
-                      onClick={() => showToast(`Selected user ${u.name}`, 'info')}
-                      className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      type="button"
+                      onClick={() => toggleUserStatus(user.id)}
+                      className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-black text-[#041018] hover:bg-cyan-400"
                     >
-                      Manage
+                      {user.status === 'inactive'
+                        ? (arabic ? 'تشغيل' : 'Restore')
+                        : (arabic ? 'إيقاف' : 'Suspend')}
                     </button>
                   </td>
                 </tr>
@@ -139,7 +87,6 @@ export const AdminUsersView: React.FC = () => {
           </table>
         </div>
       </div>
-
     </div>
   );
 };

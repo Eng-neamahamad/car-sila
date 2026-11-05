@@ -20,6 +20,7 @@ import { MessagesView } from './components/owner/MessagesView';
 import { NotificationsView } from './components/owner/NotificationsView';
 import { ActivityView } from './components/owner/ActivityView';
 import { SettingsView } from './components/owner/SettingsView';
+import { SosView } from './components/sos/SosView';
 
 // Admin Portal
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -28,6 +29,7 @@ import { AdminUsersView } from './components/admin/AdminUsersView';
 import { AdminVehiclesView } from './components/admin/AdminVehiclesView';
 import { AdminReportsView } from './components/admin/AdminReportsView';
 import { AdminSecurityView } from './components/admin/AdminSecurityView';
+import { AdminLoginView } from './components/admin/AdminLoginView';
 
 const AppContent: React.FC = () => {
   const { currentView, toasts, pings, language, theme } = useApp();
@@ -116,6 +118,13 @@ const AppContent: React.FC = () => {
         return (
           <OwnerLayout>
             <SettingsView />
+          </OwnerLayout>
+        );
+
+      case 'sos':
+        return (
+          <OwnerLayout>
+            <SosView />
           </OwnerLayout>
         );
 

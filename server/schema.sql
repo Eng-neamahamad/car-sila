@@ -103,7 +103,8 @@ create table if not exists sessions (
 
 create table if not exists visits (
   id text primary key,
-  expires_at bigint not null
+  expires_at bigint not null,
+  created_at timestamptz
 );
 
 create index if not exists vehicles_owner_idx on vehicles(owner_id);
@@ -130,4 +131,39 @@ alter table visits enable row level security;
 
 grant usage on schema public to service_role;
 grant select, insert, update, delete on all tables in schema public to service_role;
+notify pgrst, 'reload schema';
+
+create table if not exists sos_helpers (
+  user_id text primary key references accounts(id) on delete cascade,
+  active boolean not null default false,
+  lat double precision,
+  lng double precision,
+  updated_at timestamptz not null
+);
+
+create table if not exists sos_requests (
+  id text primary key,
+  requester_id text not null references accounts(id) on delete cascade,
+  kind text not null,
+  note text not null default '',
+  lat double precision not null,
+  lng double precision not null,
+  status text not null,
+  helper_id text references accounts(id),
+  created_at timestamptz not null,
+  expires_at timestamptz not null
+);
+
+create table if not exists sos_messages (
+  id text primary key,
+  request_id text not null references sos_requests(id) on delete cascade,
+  sender_id text not null,
+  body text not null,
+  created_at timestamptz not null
+);
+
+alter table sos_helpers enable row level security;
+alter table sos_requests enable row level security;
+alter table sos_messages enable row level security;
+grant select, insert, update, delete on sos_helpers, sos_requests, sos_messages to service_role;
 notify pgrst, 'reload schema';

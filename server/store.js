@@ -293,7 +293,9 @@ export const workspaceFor = async (account, visitId) => {
       users: accountRows.map((row) => publicUser(
         accountFrom(row),
         vehicleRows.filter((item) => item.ownerId === row.id).length
-      ))
+      )),
+      mailReady: Boolean(String(process.env.SMTP_USER || '').trim() && String(process.env.SMTP_PASS || '').trim()),
+      visitors: await visitorSummary()
     };
   }
 
@@ -326,12 +328,12 @@ export const workspaceFor = async (account, visitId) => {
   };
 };
 
-export const createSession = async (userId) => {
+export const createSession = async (userId, lifetimeMs = 14 * 24 * 60 * 60 * 1000) => {
   const id = randomUUID();
   must(await supabase().from('sessions').insert({
     id,
     user_id: userId,
-    expires_at: Date.now() + 14 * 24 * 60 * 60 * 1000
+    expires_at: Date.now() + lifetimeMs
   }));
   return id;
 };
@@ -349,14 +351,56 @@ export const accountForSession = async (id) => {
   return account?.status === 'active' ? account : null;
 };
 
+export const VISIT_MS = 365 * 24 * 60 * 60 * 1000;
+
 export const ensureVisit = async (id) => {
   if (id) {
-    const existing = must(await supabase().from('visits').select('*').eq('id', id).maybeSingle());
+    const existing = must(await supabase().from('visits').select('id, expires_at').eq('id', id).maybeSingle());
     if (existing && Number(existing.expires_at) > Date.now()) return existing.id;
   }
   const created = randomUUID();
-  must(await supabase().from('visits').insert({ id: created, expires_at: Date.now() + 12 * 60 * 60 * 1000 }));
+  const expiresAt = Date.now() + VISIT_MS;
+  const inserted = await supabase().from('visits').insert({
+    id: created,
+    expires_at: expiresAt,
+    created_at: new Date().toISOString()
+  });
+  if (inserted.error && /created_at/i.test(inserted.error.message || '')) {
+    must(await supabase().from('visits').insert({ id: created, expires_at: expiresAt }));
+  } else if (inserted.error) {
+    throw inserted.error;
+  }
   return created;
+};
+
+const visitStarted = (row) => {
+  if (row.created_at) {
+    const time = new Date(row.created_at).getTime();
+    if (!Number.isNaN(time)) return time;
+  }
+  const expires = Number(row.expires_at);
+  if (!Number.isFinite(expires)) return 0;
+  return expires > Date.now() + 24 * 60 * 60 * 1000 ? expires - VISIT_MS : expires;
+};
+
+export const visitorSummary = async () => {
+  const withCreated = await supabase().from('visits').select('created_at, expires_at');
+  const rows = withCreated.error && /created_at/i.test(withCreated.error.message || '')
+    ? must(await supabase().from('visits').select('expires_at'))
+    : must(withCreated);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - 6);
+  const weekStart = start.getTime();
+  const points = [0, 0, 0, 0, 0, 0, 0];
+  let week = 0;
+  rows.forEach((row) => {
+    const time = visitStarted(row);
+    if (time >= weekStart) week += 1;
+    const index = Math.floor((time - weekStart) / 86400000);
+    if (index >= 0 && index < 7) points[index] += 1;
+  });
+  return { total: rows.length, week, points };
 };
 
 const owns = (account, vehicle) =>
@@ -739,6 +783,41 @@ export const registerAccount = async ({ name, email, password, phone }) => {
   };
   await insertAccount(account);
   return { account };
+  try {
+    await insertActivity({
+      id: `act_${randomUUID()}`,
+      type: 'account_registered',
+      title: 'تسجيل حساب جديد',
+      subtitle: cleanName,
+      timeStr: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      dateGroup: 'today',
+      tagText: 'New',
+      tagType: 'info',
+      createdAt: new Date().toISOString()
+    });
+  } catch {
+    // The account is already saved. A missing activity row should not undo registration.
+  }
+  return { account };
+};
+
+export const recordFailedLogin = async (kind) => {
+  const subtitle = kind === 'admin' ? 'دخول الإدارة' : kind === 'suspended' ? 'حساب موقوف' : 'دخول الحساب';
+  try {
+    await insertActivity({
+      id: `act_${randomUUID()}`,
+      type: 'login_failed',
+      title: 'محاولة دخول فاشلة',
+      subtitle,
+      timeStr: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      dateGroup: 'today',
+      tagText: 'Failed',
+      tagType: 'warning',
+      createdAt: new Date().toISOString()
+    });
+  } catch {
+    // The login response matters more than the audit row.
+  }
 };
 
 export const loginAccount = async (email, password) => {
@@ -746,6 +825,16 @@ export const loginAccount = async (email, password) => {
   if (!account || !verifyPassword(password, account.passwordHash)) return { error: 'invalid_credentials' };
   if (account.status !== 'active') return { error: 'suspended' };
   return { account };
+};
+
+export const loginAdmin = async (password) => {
+  const admin = await accountByEmail(ADMIN_EMAIL);
+  const accepted = !!admin && admin.status === 'active' && verifyPassword(String(password || ''), admin.passwordHash);
+  if (!accepted) {
+    await recordFailedLogin('admin');
+    return { error: 'invalid_credentials' };
+  }
+  return { account: admin };
 };
 
 export const loginGoogleAccount = async ({ email, name }) => {

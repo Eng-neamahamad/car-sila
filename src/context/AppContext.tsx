@@ -18,6 +18,7 @@ import {
   ADMIN_EMAIL,
   StoredAccount,
   isAdminView,
+  isAppView,
   isOwnerView,
   readSavedView,
   VIEW_KEY
@@ -49,6 +50,7 @@ interface AppContextType {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
   login: (email: string, password: string) => void;
+  loginAdmin: (password: string) => Promise<void>;
   loginWithGoogle: (credential: string) => void;
   register: (name: string, email: string, password: string, phone?: string) => void;
   updateProfile: (name: string, email: string) => void;
@@ -61,6 +63,8 @@ interface AppContextType {
     totalScans: number;
     resolvedReportsRate: number;
   };
+  mailReady: boolean | null;
+  visitors: { total: number; week: number; points: number[] };
   toggleUserStatus: (userId: string) => void;
 
   // Vehicles
@@ -141,6 +145,7 @@ const emptyReport = (data: { category: ReportCategory; title: string; descriptio
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Navigation
   const [currentView, setViewState] = useState<AppView>(() => readSavedView(null));
+  const pendingView = useRef(localStorage.getItem(VIEW_KEY));
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('carsila_language');
     return saved === 'ar' || saved === 'en' ? saved : 'ar';
@@ -170,6 +175,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Notifications & Activity
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
+  const [mailReady, setMailReady] = useState<boolean | null>(null);
+  const [visitors, setVisitors] = useState<{ total: number; week: number; points: number[] }>({
+    total: 0,
+    week: 0,
+    points: [0, 0, 0, 0, 0, 0, 0]
+  });
 
   // Visitor Flow
   const [activeScanVehicle, setActiveScanVehicle] = useState<Vehicle | null>(null);
@@ -240,6 +251,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const hash = window.location.hash;
       const search = window.location.search;
       let token = '';
+
+      if (hash.replace(/^#/, '') === 'admin') {
+        setViewState('admin-login');
+        return;
+      }
 
       if (hash.includes('scan=')) {
         token = decodeURIComponent(hash.split('scan=')[1]?.split('&')[0] || '');
@@ -363,8 +379,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: user.createdAt,
       avatar: user.avatar
     })));
+    setMailReady(data.user?.role === 'admin' && typeof data.mailReady === 'boolean' ? data.mailReady : null);
+    setVisitors(data.user?.role === 'admin' && data.visitors
+      ? data.visitors
+      : { total: 0, week: 0, points: [0, 0, 0, 0, 0, 0, 0] });
+    const pending = pendingView.current;
+    pendingView.current = null;
     setViewState((view) => {
-      if (!data.user && (isOwnerView(view) || isAdminView(view))) return 'landing';
+      if (data.user?.role === 'admin' && pending && isAppView(pending) && isAdminView(pending)) return pending;
+      if (data.user?.role === 'admin' && view === 'admin-login') return 'admin-overview';
+      if (!data.user && (isOwnerView(view) || isAdminView(view))) {
+        return window.location.hash.replace(/^#/, '') === 'admin' ? 'admin-login' : 'landing';
+      }
       return view;
     });
   };
@@ -439,12 +465,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setCurrentView = (view: AppView) => {
     const role = currentUser?.role;
+    if (view === 'admin-login') {
+      setViewState(role === 'admin' ? 'admin-overview' : 'admin-login');
+      return;
+    }
     if (isAdminView(view) && role !== 'admin') {
-      showToast(
-        language === 'ar' ? 'لوحة الإدارة متاحة للمسؤول فقط' : 'The admin panel is only available to the administrator',
-        'error'
-      );
-      setViewState(role === 'owner' ? 'dashboard' : 'login');
+      if (role === 'owner') {
+        showToast(
+          language === 'ar' ? 'لوحة الإدارة متاحة للمسؤول فقط' : 'The admin panel is only available to the administrator',
+          'error'
+        );
+        setViewState('dashboard');
+        return;
+      }
+      setViewState('admin-login');
       return;
     }
     if (isOwnerView(view) && role !== 'owner') {
@@ -481,6 +515,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .then(openSession)
       .catch(explain);
   };
+
+  const loginAdmin = (password: string) =>
+    api<Workspace>('/api/auth/admin', { password }).then((data) => {
+      openSession(data);
+    });
 
   const register = (name: string, email: string, password: string, phone?: string) => {
     const normalized = email.trim().toLowerCase();
@@ -771,6 +810,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentUser,
         setCurrentUser,
         login,
+        loginAdmin,
         loginWithGoogle,
         register,
         updateProfile,
@@ -778,6 +818,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         allUsers: visibleUsers,
         users: visibleUsers,
         adminStats,
+        mailReady,
+        visitors,
         toggleUserStatus,
 
         vehicles: visibleVehicles,
