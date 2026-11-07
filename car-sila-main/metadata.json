@@ -1,0 +1,6 @@
+{
+  "name": "CAR-SILA — Smart Vehicle Communication Platform",
+  "description": "Privacy-first smart vehicle communication platform connecting drivers and car owners seamlessly via dynamic QR codes, instant notifications, anonymous chat, and vehicle management.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
