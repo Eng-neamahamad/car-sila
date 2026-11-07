@@ -4,7 +4,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 
-const webpush = createRequire(import.meta.url)('web-push');
+const require = createRequire(import.meta.url);
+let webpush;
+const pushLibrary = () => {
+  if (!webpush) webpush = require('web-push');
+  return webpush;
+};
 const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'push.json');
 
 let client;
@@ -32,8 +37,12 @@ const load = () => {
 let disk = load();
 
 const persist = () => {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, JSON.stringify(disk));
+  try {
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, JSON.stringify(disk));
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 const missing = (error) => ['PGRST205', 'PGRST204', '42703'].includes(error?.code);
@@ -43,7 +52,7 @@ const ready = () => {
   const privateKey = process.env.VAPID_PRIVATE_KEY || '';
   if (!publicKey || !privateKey) return false;
   if (!configured) {
-    webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@carsila.com', publicKey, privateKey);
+    pushLibrary().setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@carsila.com', publicKey, privateKey);
     configured = true;
   }
   return true;
@@ -115,7 +124,7 @@ export const sendCallAlert = async (userId, { title, body }) => {
   });
   await Promise.all(subscriptions.map(async (item) => {
     try {
-      await webpush.sendNotification({
+      await pushLibrary().sendNotification({
         endpoint: item.endpoint,
         keys: { p256dh: item.p256dh, auth: item.auth }
       }, payload, { TTL: 90, urgency: 'high' });

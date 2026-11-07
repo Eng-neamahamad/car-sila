@@ -59,7 +59,11 @@ const loadEnvFile = () => {
 };
 
 loadEnvFile();
-await loadDatabase();
+try {
+  await loadDatabase();
+} catch (error) {
+  console.error(error);
+}
 
 const app = express();
 app.set('trust proxy', 1);

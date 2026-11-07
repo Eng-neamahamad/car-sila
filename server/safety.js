@@ -47,8 +47,12 @@ const locked = (fn) => {
 };
 
 const persist = () => {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, JSON.stringify(disk));
+  try {
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, JSON.stringify(disk));
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 const future = (value) => {
