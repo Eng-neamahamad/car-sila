@@ -170,8 +170,16 @@ const setSession = async (res, account) => {
 const fail = (res, error) => {
   console.error(error);
   if (res.headersSent) return;
-  const missingTable = error?.code === 'PGRST205';
-  res.status(500).json({ error: missingTable ? 'schema_missing' : 'request_failed' });
+  const text = String(error?.message || error || '');
+  const missingTable = ['PGRST205', 'PGRST204', '42P01', '42703'].includes(error?.code);
+  const errorName = missingTable
+    ? 'schema_missing'
+    : /invalid api key|unauthorized|jwt/i.test(text)
+      ? 'bad_database_key'
+      : /not configured|fetch failed|enotfound|getaddrinfo/i.test(text)
+        ? 'bad_database_url'
+        : 'request_failed';
+  res.status(500).json({ error: errorName, reason: error?.code || text.slice(0, 180) });
 };
 
 app.get('/api/bootstrap', async (req, res) => {

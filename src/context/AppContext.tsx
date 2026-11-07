@@ -391,6 +391,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       invalid_brand: ['اختَر ماركة من القائمة، أو اكتب الماركة في خيار أخرى', 'Choose a brand from the list, or type one under Other'],
       vehicle_limit: ['كل حساب يقدر يسجّل 10 سيارات كحد أقصى', 'Each account can register up to 10 vehicles'],
       schema_missing: ['جداول قاعدة البيانات مش منشأة بعد. من Supabase افتح SQL Editor، الصق ملف server/schema.sql كامل، واضغط Run.', 'The database tables are not created yet. In Supabase open SQL Editor, paste all of server/schema.sql, and press Run.'],
+      bad_database_key: ['مفتاح قاعدة البيانات على Vercel غير صحيح. افتح Environment Variables وتأكد من SUPABASE_SERVICE_ROLE_KEY ثم أعد النشر.', 'The database key on Vercel is wrong. Check SUPABASE_SERVICE_ROLE_KEY in Environment Variables, then redeploy.'],
+      bad_database_url: ['عنوان قاعدة البيانات على Vercel غير صحيح. تأكد من SUPABASE_URL ثم أعد النشر.', 'The database address on Vercel is wrong. Check SUPABASE_URL, then redeploy.'],
       own_vehicle: ['ما بتقدر تتصل بسيارتك من نفس الحساب', 'You cannot call your own car from this account'],
       call_busy: ['في اتصال طارئ قائم على هذه السيارة', 'An emergency call is already open for this car']
     };

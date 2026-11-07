@@ -15,10 +15,12 @@ const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data',
 let client;
 let configured = false;
 
+const setting = (name) => String(process.env[name] || '').trim().replace(/^["']|["']$/g, '');
+
 const supabase = () => {
   if (!client) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = setting('SUPABASE_URL');
+    const key = setting('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !key) throw new Error('Supabase is not configured');
     client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   }
@@ -48,17 +50,17 @@ const persist = () => {
 const missing = (error) => ['PGRST205', 'PGRST204', '42703'].includes(error?.code);
 
 const ready = () => {
-  const publicKey = process.env.VAPID_PUBLIC_KEY || '';
-  const privateKey = process.env.VAPID_PRIVATE_KEY || '';
+  const publicKey = setting('VAPID_PUBLIC_KEY');
+  const privateKey = setting('VAPID_PRIVATE_KEY');
   if (!publicKey || !privateKey) return false;
   if (!configured) {
-    pushLibrary().setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@carsila.com', publicKey, privateKey);
+    pushLibrary().setVapidDetails(setting('VAPID_SUBJECT') || 'mailto:admin@carsila.com', publicKey, privateKey);
     configured = true;
   }
   return true;
 };
 
-export const pushPublicKey = () => process.env.VAPID_PUBLIC_KEY || '';
+export const pushPublicKey = () => setting('VAPID_PUBLIC_KEY');
 
 const validSubscription = (value) => {
   const endpoint = String(value?.endpoint || '');
