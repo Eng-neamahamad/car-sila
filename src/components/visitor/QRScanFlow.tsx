@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import { useApp } from '../../context/AppContext';
+import { TranslateControl } from '../common/TranslatedText';
+import { EmergencyCall } from '../call/EmergencyCall';
+import { ReturnCountdown } from '../common/QuickReturn';
+import { compressPhoto } from '../../lib/photo';
 import { ReportCategory, VehicleStatus } from '../../types';
 import {
   Car,
@@ -63,6 +67,9 @@ export const QRScanFlow: React.FC = () => {
   const [note, setNote] = useState('');
   const [chatText, setChatText] = useState('');
   const [sending, setSending] = useState(false);
+  const [photo, setPhoto] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   const leave = () => {
     setActiveScanVehicle(null);
@@ -82,6 +89,19 @@ export const QRScanFlow: React.FC = () => {
     if (step !== 'success') return;
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversation?.messages.length, step]);
+
+  const lookupVehicle = useRef(findVehicleByCode);
+  lookupVehicle.current = findVehicleByCode;
+  useEffect(() => {
+    const token = activeScanVehicle?.qrToken;
+    if (!token || step === 'code') return;
+    const timer = window.setInterval(() => {
+      void lookupVehicle.current(token).then((found) => {
+        if (found) setActiveScanVehicle(found);
+      });
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [activeScanVehicle?.qrToken, setActiveScanVehicle, step]);
 
   const reasons: {
     category: ReportCategory;
@@ -211,6 +231,7 @@ export const QRScanFlow: React.FC = () => {
       title: selected.title,
       description: note.trim() || selected.title,
       hasLocation: false,
+      photo: photo || undefined,
     });
     setSending(false);
     if (report.id) setStep('success');
@@ -320,6 +341,13 @@ export const QRScanFlow: React.FC = () => {
               </button>
             </form>
           </section>
+        )}
+
+        {activeScanVehicle && activeScanVehicle.status !== 'inactive' && step !== 'code' && (
+          <div className="mb-4 space-y-3">
+            <ReturnCountdown returnAt={activeScanVehicle.returnAt} language={language} />
+            <EmergencyCall token={activeScanVehicle.qrToken} language={language} />
+          </div>
         )}
 
         {step === 'welcome' && activeScanVehicle && (
@@ -441,6 +469,47 @@ export const QRScanFlow: React.FC = () => {
               placeholder={t('visitorNotePlaceholder')}
               className="w-full resize-none rounded-2xl border border-white/10 bg-[#0A0E1A] p-3 text-sm outline-none focus:border-[#38BDF8]"
             />
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (!file) return;
+                setPhotoError('');
+                void compressPhoto(file).then((data) => {
+                  if (data.length > 520000) {
+                    setPhoto('');
+                    setPhotoError(language === 'ar' ? 'الصورة كبيرة. قرّبها أكثر أو التقط صورة أوضح وأصغر.' : 'That photo is too large. Move closer or take a smaller one.');
+                    return;
+                  }
+                  setPhoto(data);
+                }).catch(() => {
+                  setPhotoError(language === 'ar' ? 'تعذر قراءة الصورة.' : 'The photo could not be read.');
+                });
+              }}
+            />
+            {photo ? (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+                <img src={photo} alt="" className="max-h-56 w-full object-cover" />
+                <button type="button" onClick={() => setPhoto('')} className="w-full py-2 text-xs font-bold text-slate-300 cursor-pointer">
+                  {language === 'ar' ? 'حذف الصورة' : 'Remove photo'}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3 text-sm font-bold text-white cursor-pointer"
+              >
+                <Camera className="h-4 w-4" />
+                {language === 'ar' ? 'إرفاق صورة الحادثة' : 'Attach a photo of the incident'}
+              </button>
+            )}
+            {photoError && <p className="mt-2 text-xs font-bold text-[#EF4444]">{photoError}</p>}
             <button
               type="button"
               onClick={sendReport}
@@ -467,16 +536,17 @@ export const QRScanFlow: React.FC = () => {
               <p className="mb-3 text-xs font-bold text-slate-400">{t('visitorChatHint')}</p>
               <div className="mb-3 max-h-48 space-y-2 overflow-y-auto">
                 {(conversation?.messages || []).map((message) => (
-                  <div
+                  <TranslateControl
                     key={message.id}
+                    text={message.text}
+                    language={language}
+                    alignEnd={message.senderRole !== 'reporter'}
                     className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${
                       message.senderRole === 'reporter'
-                        ? 'me-auto bg-[#38BDF8]/15 text-[#38BDF8]'
-                        : 'ms-auto bg-white/10 text-white'
+                        ? 'bg-[#38BDF8]/15 text-[#38BDF8]'
+                        : 'bg-white/10 text-white'
                     }`}
-                  >
-                    {message.text}
-                  </div>
+                  />
                 ))}
                 <div ref={chatEndRef} />
               </div>

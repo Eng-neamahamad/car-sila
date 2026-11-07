@@ -84,7 +84,9 @@ export const AdminReportsView: React.FC = () => {
                 <tr key={rep.id} className="hover:bg-slate-700/30 transition-colors">
                   <td className="px-5 py-4">
                     <div>
-                      <h4 className="font-extrabold text-white text-xs">{rep.title}</h4>
+                      <h4 className="font-extrabold text-white text-xs">
+                        {rep.title}
+                      </h4>
                       <p className="text-[11px] text-slate-400 mt-0.5 max-w-sm line-clamp-1">
                         "{rep.description}"
                       </p>

@@ -12,6 +12,7 @@ import {
   Check,
   Sparkles
 } from 'lucide-react';
+import { PhoneAlertButton } from './PhoneAlertButton';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -98,6 +99,13 @@ export const SettingsView: React.FC = () => {
         </h3>
 
         <div className="space-y-4 divide-y divide-cyan-500/10 text-sm">
+          <div className="pt-3">
+            <h4 className="font-bold text-white">{language === 'ar' ? 'رنين الجوال' : 'Phone ring'}</h4>
+            <div className="mt-2">
+              <PhoneAlertButton />
+            </div>
+          </div>
+
           {/* Email Notifications */}
           <div className="pt-3 flex items-center justify-between">
             <div>

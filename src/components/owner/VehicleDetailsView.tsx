@@ -9,6 +9,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { QRStickerCard } from '../common/QRStickerCard';
+import { QuickReturn } from '../common/QuickReturn';
 
 export const VehicleDetailsView: React.FC = () => {
   const {
@@ -168,6 +169,8 @@ export const VehicleDetailsView: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            <QuickReturn vehicle={vehicle} />
 
             <div className="pt-2">
               <div className="flex items-center justify-between mb-3">

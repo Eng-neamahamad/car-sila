@@ -27,6 +27,7 @@ export type PublicVehicle = {
   color: string;
   plateNumber: string;
   status: VehicleStatus;
+  returnAt?: string;
 };
 
 export const toVisitorVehicle = (vehicle: PublicVehicle): Vehicle => ({
@@ -42,7 +43,8 @@ export const toVisitorVehicle = (vehicle: PublicVehicle): Vehicle => ({
   status: vehicle.status,
   scansCount: 0,
   reportsCount: 0,
-  createdAt: ''
+  createdAt: '',
+  returnAt: vehicle.returnAt
 });
 
 export async function api<T>(path: string, body?: unknown): Promise<T> {
