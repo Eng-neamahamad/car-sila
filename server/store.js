@@ -799,6 +799,8 @@ export const registerAccount = async ({ name, email, password, phone }) => {
   if (!cleanName) return { error: 'invalid_input' };
   if (!cleanEmail || !cleanEmail.includes('@')) return { error: 'invalid_email' };
   if (String(password || '').length < 6) return { error: 'short_password' };
+  const cleanPhone = cleanText(phone, 20);
+  if (!cleanPhone) return { error: 'invalid_phone' };
   if (cleanEmail === ADMIN_EMAIL) return { error: 'reserved_email' };
   if (await accountByEmail(cleanEmail)) return { error: 'email_taken' };
   const account = {
@@ -806,7 +808,7 @@ export const registerAccount = async ({ name, email, password, phone }) => {
     name: cleanName,
     email: cleanEmail,
     passwordHash: hashPassword(password),
-    phone: cleanText(phone, 20) || undefined,
+    phone: cleanPhone,
     role: 'owner',
     status: 'active',
     createdAt: new Date().toISOString().slice(0, 10),

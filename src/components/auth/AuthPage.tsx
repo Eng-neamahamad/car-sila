@@ -128,6 +128,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
         showToast(language === 'ar' ? 'يرجى إدخال الاسم الكامل' : 'Please enter full name', 'warning');
         return;
       }
+      if (!phone.trim()) {
+        showToast(language === 'ar' ? 'يرجى إدخال رقم الجوال' : 'Please enter your phone number', 'warning');
+        return;
+      }
       if (!email.trim() || !email.includes('@')) {
         showToast(
           language === 'ar' ? 'البريد لازم يكون فيه @ مثل name@gmail.com' : 'The email needs an @ sign, like name@gmail.com',
@@ -220,13 +224,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                 </div>
               )}
 
-              {/* Phone (Optional for emergencies if register) */}
               {isRegister && (
                 <div>
                   <label className={`block text-xs font-bold mb-1.5 ${
                     theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                   }`}>
-                    {language === 'ar' ? 'رقم الجوال (لإشعارات الطوارئ)' : 'Phone Number (Emergency Alerts)'}
+                    {language === 'ar' ? 'رقم الجوال' : 'Phone number'}
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 rtl:left-auto rtl:right-0 pl-3.5 rtl:pl-0 rtl:pr-3.5 flex items-center pointer-events-none text-slate-400">
@@ -234,6 +237,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
                     </div>
                     <input
                       type="tel"
+                      required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder={language === 'ar' ? 'مثال: 059XXXXXXXX' : '+970 59 XXX XXXX'}

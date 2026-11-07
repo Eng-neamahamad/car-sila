@@ -50,7 +50,7 @@ interface AppContextType {
   setCurrentUser: (user: User | null) => void;
   login: (email: string, password: string) => void;
   loginWithGoogle: (credential: string) => void;
-  register: (name: string, email: string, password: string, phone?: string) => void;
+  register: (name: string, email: string, password: string, phone: string) => void;
   updateProfile: (name: string, email: string) => void;
   logout: () => void;
   allUsers: User[];
@@ -384,6 +384,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       invalid_input: ['البيانات المدخلة غير صالحة', 'The entered details are not valid'],
       invalid_email: ['البريد لازم يكون فيه @ مثل name@gmail.com', 'The email needs an @ sign, like name@gmail.com'],
       short_password: ['كلمة المرور لازم تكون 6 أحرف على الأقل', 'The password must be at least 6 characters'],
+      invalid_phone: ['رقم الجوال مطلوب', 'A phone number is required'],
       google_failed: ['تعذر التحقق من حساب Google', 'Google could not be verified'],
       admin_google: ['حساب المسؤول يدخل من البريد وكلمة المرور فقط', 'The administrator signs in with email and password only'],
       plate_taken: ['رقم اللوحة مسجّل من قبل', 'This plate is already registered'],
@@ -489,7 +490,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .catch(explain);
   };
 
-  const register = (name: string, email: string, password: string, phone?: string) => {
+  const register = (name: string, email: string, password: string, phone: string) => {
     const normalized = email.trim().toLowerCase();
     if (normalized === ADMIN_EMAIL || knownEmails.current.has(normalized)) {
       explain(new ApiError(normalized === ADMIN_EMAIL ? 'reserved_email' : 'email_taken'));
