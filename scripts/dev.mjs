@@ -31,7 +31,7 @@ if (await busy(5173) || await busy(8787)) {
 
 const children = [
   spawn(process.execPath, ['server/index.js'], { stdio: 'inherit' }),
-  spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', '5173', '--strictPort'], { stdio: 'inherit' })
+  spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '0.0.0.0', '--port', '5173', '--strictPort'], { stdio: 'inherit' })
 ];
 
 const stop = () => {
