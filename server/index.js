@@ -5,6 +5,8 @@ import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import helmet from 'helmet';
+import { pushPublicKey, removePushSubscription, savePushSubscription } from './push.js';
+import { translateInto } from './translate.js';
 import {
   accountForSession,
   addVehicle,
@@ -22,11 +24,21 @@ import {
   markAllNotifications,
   markNotification,
   markOwnerConversationsRead,
+  ownerCallSignal,
+  ownerCallState,
+  ownerIncoming,
   publicVehicle,
   recordFailedLogin,
   regenerateToken,
   registerAccount,
+  reportPhotoFor,
   sendMessage,
+  setVehicleReturn,
+  startVisitorCall,
+  visitorCallEnd,
+  visitorCallIce,
+  visitorCallState,
+  cleanText,
   submitReport,
   toggleUserStatus,
   updateProfile,
@@ -51,7 +63,11 @@ const loadEnvFile = () => {
 };
 
 loadEnvFile();
-await loadDatabase();
+try {
+  await loadDatabase();
+} catch (error) {
+  console.error(error);
+}
 
 const app = express();
 app.set('trust proxy', 1);
@@ -80,13 +96,13 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '800kb' }));
 app.use(cookieParser());
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
   next();
 });
 
@@ -108,12 +124,30 @@ const reportLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: 'rate_limited' })
 });
 
+const translateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${clientAddress(req)}:translate`,
+  handler: (_req, res) => res.status(429).json({ error: 'rate_limited' })
+});
+
 const messageLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => `${clientAddress(req)}:message`,
+  handler: (_req, res) => res.status(429).json({ error: 'rate_limited' })
+});
+
+const callLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${clientAddress(req)}:call`,
   handler: (_req, res) => res.status(429).json({ error: 'rate_limited' })
 });
 
@@ -139,7 +173,17 @@ const setSession = async (res, account) => {
 
 const fail = (res, error) => {
   console.error(error);
-  if (!res.headersSent) res.status(500).json({ error: 'request_failed' });
+  if (res.headersSent) return;
+  const text = String(error?.message || error || '');
+  const missingTable = ['PGRST205', 'PGRST204', '42P01', '42703'].includes(error?.code);
+  const errorName = missingTable
+    ? 'schema_missing'
+    : /invalid api key|unauthorized|jwt/i.test(text)
+      ? 'bad_database_key'
+      : /not configured|fetch failed|enotfound|getaddrinfo/i.test(text)
+        ? 'bad_database_url'
+        : 'request_failed';
+  res.status(500).json({ error: errorName, reason: error?.code || text.slice(0, 180) });
 };
 
 app.get('/api/bootstrap', async (req, res) => {
@@ -242,8 +286,121 @@ app.post('/api/public/reports', reportLimiter, async (req, res) => {
       res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
     }
     const result = await submitReport(visitId, req.body || {}, await currentAccount(req));
-    if (result.error) return res.status(404).json({ error: result.error });
+    if (result.error) return res.status(result.error === 'not_found' ? 404 : 400).json({ error: result.error });
     res.status(201).json({ conversation: result.conversation });
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+const openVisit = async (req, res) => {
+  const visitId = await ensureVisit(currentVisit(req));
+  if (visitId !== currentVisit(req)) {
+    res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: 12 * 60 * 60 * 1000 });
+  }
+  return visitId;
+};
+
+app.post('/api/public/calls', callLimiter, async (req, res) => {
+  try {
+    const visitId = await openVisit(req, res);
+    const result = await startVisitorCall(visitId, req.body?.token, req.body?.offer, await currentAccount(req));
+    if (result.error) {
+      const status = result.error === 'not_found' ? 404 : result.error === 'forbidden' || result.error === 'own_vehicle' ? 403 : result.error === 'call_busy' ? 409 : 400;
+      return res.status(status).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.get('/api/public/calls', async (req, res) => {
+  try {
+    const result = await visitorCallState(req.query.id, currentVisit(req));
+    if (result.error) return res.status(403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/public/calls/ice', callLimiter, async (req, res) => {
+  try {
+    const result = await visitorCallIce(req.body?.id, currentVisit(req), req.body?.candidate);
+    if (result.error) return res.status(result.error === 'ended' ? 409 : 403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/public/calls/end', async (req, res) => {
+  try {
+    const result = await visitorCallEnd(req.body?.id, currentVisit(req));
+    if (result.error) return res.status(403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.get('/api/calls/incoming', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const result = await ownerIncoming(account);
+    if (result.error) return res.status(403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.get('/api/calls/live', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const result = await ownerCallState(account, req.query.id);
+    if (result.error) return res.status(403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/calls/signal', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const result = await ownerCallSignal(account, req.body?.id, req.body || {});
+    if (result.error) return res.status(result.error === 'invalid_input' ? 400 : result.error === 'ended' ? 409 : 403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.get('/api/reports/photo', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const result = await reportPhotoFor(account, req.query.id);
+    if (result.error) return res.status(result.error === 'not_found' ? 404 : 403).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/translate', translateLimiter, async (req, res) => {
+  try {
+    const text = cleanText(req.body?.text, 500);
+    const to = req.body?.to === 'en' ? 'en' : 'ar';
+    if (!text) return res.status(400).json({ error: 'invalid_input' });
+    const result = await translateInto(text, to);
+    if (!result) return res.status(502).json({ error: 'translate_failed' });
+    res.json(result);
   } catch (error) {
     fail(res, error);
   }
@@ -307,6 +464,18 @@ app.post('/api/vehicles/clear', async (req, res) => {
     if (!account) return;
     const result = await clearOwnVehicles(account);
     if (result.error) return res.status(403).json({ error: result.error });
+    await sendWorkspace(res, account, currentVisit(req));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/vehicles/return', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    const result = await setVehicleReturn(account, req.body?.id, req.body?.minutes);
+    if (result.error) return res.status(result.error === 'invalid_input' ? 400 : 403).json({ error: result.error });
     await sendWorkspace(res, account, currentVisit(req));
   } catch (error) {
     fail(res, error);
@@ -438,6 +607,37 @@ app.get('/api/sos', async (req, res) => {
     const account = await requireAccount(req, res);
     if (!account) return;
     sendSos(res, await sosState(account));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.get('/api/push/key', (_req, res) => {
+  const key = pushPublicKey();
+  if (!key) return res.status(503).json({ error: 'push_unavailable' });
+  res.json({ key });
+});
+
+app.post('/api/push/subscribe', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account || account.role !== 'owner') {
+      if (account) res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    const result = await savePushSubscription(account.id, req.body || {});
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+app.post('/api/push/unsubscribe', async (req, res) => {
+  try {
+    const account = await requireAccount(req, res);
+    if (!account) return;
+    res.json(await removePushSubscription(account.id, req.body?.endpoint));
   } catch (error) {
     fail(res, error);
   }

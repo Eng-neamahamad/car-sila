@@ -8,7 +8,8 @@ import {
   QrCode,
   CheckCheck,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  Phone
 } from 'lucide-react';
 
 export const NotificationsView: React.FC = () => {
@@ -32,6 +33,8 @@ export const NotificationsView: React.FC = () => {
         return { icon: CheckCircle2, color: 'bg-emerald-500/15 text-emerald-300' };
       case 'chat_message':
         return { icon: MessageSquare, color: 'bg-cyan-500/15 text-cyan-300' };
+      case 'voice_call':
+        return { icon: Phone, color: 'bg-rose-500/15 text-rose-300' };
       default:
         return { icon: QrCode, color: 'bg-sky-500/15 text-sky-300' };
     }

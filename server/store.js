@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { sendReportEmail } from './mail.js';
+import { cachedReturn, incomingCalls, ownerSignal, readPhoto, savePhoto, saveReturn, startCall, visitorCall, visitorHangup, visitorIce, ownerCall } from './safety.js';
+import { unpackText } from './translate.js';
 
 export const ADMIN_EMAIL = 'admin@carsila.com';
 const ADMIN_PASSWORD = 'Admin@2026';
@@ -12,10 +14,12 @@ const CATEGORIES = new Set(['blocking', 'lights', 'accident', 'lost_item', 'cont
 
 let client;
 
+const setting = (name) => String(process.env[name] || '').trim().replace(/^["']|["']$/g, '');
+
 const supabase = () => {
   if (!client) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = setting('SUPABASE_URL');
+    const key = setting('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !key) throw new Error('Supabase is not configured');
     client = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -91,49 +95,70 @@ const vehicleFrom = (row) => row && ({
   scansCount: row.scans_count,
   reportsCount: row.reports_count,
   imageUrl: row.image_url || undefined,
-  createdAt: row.created_at
+  createdAt: row.created_at,
+  returnAt: futureStamp(row.return_at) || cachedReturn(row.id) || undefined
 });
 
-const reportFrom = (row) => ({
+const reportFrom = (row) => {
+  const title = unpackText(row.title);
+  const description = unpackText(row.description);
+  return {
   id: row.id,
   vehicleId: row.vehicle_id,
   vehicleName: row.vehicle_name,
   vehiclePlate: row.vehicle_plate,
   category: row.category,
-  title: row.title,
-  description: row.description,
+  title: title.text,
+  titleTranslation: title.translation || undefined,
+  titleSourceLang: title.from || undefined,
+  titleTargetLang: title.to || undefined,
+  description: description.text,
+  translation: description.translation || undefined,
+  sourceLang: description.from || undefined,
+  targetLang: description.to || undefined,
   hasLocation: row.has_location,
   status: row.status,
   reporterName: row.reporter_name,
   reporterSessionId: row.reporter_session_id,
   createdAt: row.created_at,
   timestamp: row.timestamp
-});
+}; };
 
-const messageFrom = (row) => ({
+const messageFrom = (row) => {
+  const body = unpackText(row.body);
+  return {
   id: row.id,
   conversationId: row.conversation_id,
   senderRole: row.sender_role,
   senderName: row.sender_name,
-  text: row.body,
+  text: body.text,
+  translation: body.translation || undefined,
+  sourceLang: body.from || undefined,
+  targetLang: body.to || undefined,
   timestamp: row.timestamp,
   createdAt: row.created_at,
   isRead: row.is_read
-});
+}; };
 
-const conversationFrom = (row, messages) => ({
+const conversationFrom = (row, messages) => {
+  const last = unpackText(row.last_message);
+  return {
   id: row.id,
   reportId: row.report_id,
   vehicleId: row.vehicle_id,
   vehicleName: row.vehicle_name,
   vehiclePlate: row.vehicle_plate,
-  lastMessage: row.last_message,
+  lastMessage: last.text,
+  lastMessageTranslation: last.translation || undefined,
+  lastMessageSource: last.from || undefined,
+  lastMessageTarget: last.to || undefined,
   lastMessageTime: row.last_message_time,
   unreadCount: row.unread_count,
   reporterSessionId: row.reporter_session_id,
   status: row.status,
   messages
-});
+};
+};
 
 const notificationFrom = (row) => ({
   id: row.id,
@@ -191,6 +216,19 @@ export const publicUser = (account, vehiclesCount = 0) => ({
   vehiclesCount
 });
 
+const futureStamp = (value) => {
+  const time = new Date(value || 0).getTime();
+  return Number.isFinite(time) && time > Date.now() ? new Date(time).toISOString() : '';
+};
+
+const photoData = (value) => {
+  const text = String(value || '');
+  if (!text) return '';
+  if (!text.startsWith('data:image/jpeg;base64,') || text.length > 550000) return null;
+  if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/.test(text)) return null;
+  return text.replace(/\s/g, '');
+};
+
 export const publicVehicle = (vehicle) => ({
   qrToken: vehicle.qrToken,
   brand: vehicle.brand,
@@ -198,8 +236,47 @@ export const publicVehicle = (vehicle) => ({
   year: vehicle.year,
   color: vehicle.color,
   plateNumber: vehicle.plateNumber,
-  status: vehicle.status
+  status: vehicle.status,
+  returnAt: vehicle.returnAt || undefined
 });
+
+export const setVehicleReturn = async (account, id, minutes) => {
+  if (!account || account.role !== 'owner') return { error: 'forbidden' };
+  const vehicle = await vehicleById(id);
+  if (!vehicle || vehicle.ownerId !== account.id) return { error: 'forbidden' };
+  const value = Number(minutes);
+  if (![0, 5, 10, 15, 30].includes(value)) return { error: 'invalid_input' };
+  const returnAt = value === 0 ? '' : new Date(Date.now() + value * 60 * 1000).toISOString();
+  await saveReturn(id, returnAt);
+  return {};
+};
+
+export const reportPhotoFor = async (account, id) => {
+  if (!account) return { error: 'forbidden' };
+  const row = must(await supabase().from('reports').select('id,vehicle_id,created_at').eq('id', id).maybeSingle());
+  if (!row) return { error: 'not_found' };
+  const vehicle = await vehicleById(row.vehicle_id);
+  if (account.role !== 'admin' && vehicle?.ownerId !== account.id) return { error: 'forbidden' };
+  const saved = await readPhoto(id);
+  if (!saved) return { error: 'not_found' };
+  return { photo: saved.photo, capturedAt: saved.capturedAt || row.created_at };
+};
+
+export const startVisitorCall = async (visitId, token, offer, account) => {
+  const vehicle = await findVehicleByPublicCode(token);
+  if (!vehicle || vehicle.status === 'inactive') return { error: 'not_found' };
+  if (account && account.id === vehicle.ownerId) return { error: 'own_vehicle' };
+  return startCall({ vehicle, visitId, offer });
+};
+
+export const visitorCallState = (id, visitId) => visitorCall(id, visitId);
+export const visitorCallIce = (id, visitId, candidate) => visitorIce(id, visitId, candidate);
+export const visitorCallEnd = (id, visitId) => visitorHangup(id, visitId);
+export const ownerIncoming = (account) => account?.role === 'owner' ? incomingCalls(account.id) : { error: 'forbidden' };
+export const ownerCallState = (account, id) => account?.role === 'owner' ? ownerCall(id, account.id) : { error: 'forbidden' };
+export const ownerCallSignal = (account, id, body) => account?.role === 'owner'
+  ? ownerSignal(id, account.id, body || {})
+  : { error: 'forbidden' };
 
 export const findVehicleByPublicCode = async (code) => {
   const typed = compact(code);
@@ -535,6 +612,8 @@ export const submitReport = async (visitId, input, account) => {
   const category = CATEGORIES.has(input.category) ? input.category : 'other';
   const title = cleanText(input.title, 80) || 'Report';
   const description = cleanText(input.description, 500) || title;
+  const photo = photoData(input.photo);
+  if (photo === null) return { error: 'invalid_input' };
   const reporterName = account?.status === 'active' && account.name
     ? cleanText(account.name, 60)
     : 'زائر';
@@ -563,6 +642,7 @@ export const submitReport = async (visitId, input, account) => {
     created_at: now.toISOString(),
     timestamp: `Today • ${stamp}`
   }));
+  if (photo) await savePhoto(reportId, photo, now.toISOString());
   must(await supabase().from('vehicles').update({
     reports_count: vehicle.reportsCount + 1,
     scans_count: vehicle.scansCount + 1
@@ -744,7 +824,6 @@ export const toggleUserStatus = async (admin, userId) => {
   if (!target || target.role === 'admin' || target.id === admin.id) return { error: 'forbidden' };
   const status = target.status === 'active' ? 'inactive' : 'active';
   must(await supabase().from('accounts').update({ status }).eq('id', userId));
-  if (status === 'inactive') must(await supabase().from('sessions').delete().eq('user_id', userId));
   return { ok: true };
 };
 
@@ -768,6 +847,8 @@ export const registerAccount = async ({ name, email, password, phone }) => {
   if (!cleanName) return { error: 'invalid_input' };
   if (!cleanEmail || !cleanEmail.includes('@')) return { error: 'invalid_email' };
   if (String(password || '').length < 6) return { error: 'short_password' };
+  const cleanPhone = cleanText(phone, 20);
+  if (!cleanPhone) return { error: 'invalid_phone' };
   if (cleanEmail === ADMIN_EMAIL) return { error: 'reserved_email' };
   if (await accountByEmail(cleanEmail)) return { error: 'email_taken' };
   const account = {
@@ -775,7 +856,7 @@ export const registerAccount = async ({ name, email, password, phone }) => {
     name: cleanName,
     email: cleanEmail,
     passwordHash: hashPassword(password),
-    phone: cleanText(phone, 20) || undefined,
+    phone: cleanPhone,
     role: 'owner',
     status: 'active',
     createdAt: new Date().toISOString().slice(0, 10),

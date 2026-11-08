@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { TranslateControl } from '../common/TranslatedText';
+import { api } from '../../data/api';
 import {
   FileText,
   AlertTriangle,
@@ -32,6 +34,7 @@ export const ReportsView: React.FC = () => {
   } = useApp();
 
   const [filterTab, setFilterTab] = useState<'all' | 'new' | 'in_progress' | 'resolved'>('all');
+  const [proof, setProof] = useState<{ photo: string; capturedAt: string } | null>(null);
 
   const filteredReports = reports.filter((r) => {
     if (filterTab === 'all') return true;
@@ -39,6 +42,24 @@ export const ReportsView: React.FC = () => {
   });
 
   const selectedReport = reports.find((r) => r.id === selectedReportId) || null;
+
+  useEffect(() => {
+    if (!selectedReportId) {
+      setProof(null);
+      return;
+    }
+    let gone = false;
+    api<{ photo: string; capturedAt: string }>(`/api/reports/photo?id=${encodeURIComponent(selectedReportId)}`)
+      .then((data) => {
+        if (!gone) setProof(data);
+      })
+      .catch(() => {
+        if (!gone) setProof(null);
+      });
+    return () => {
+      gone = true;
+    };
+  }, [selectedReportId]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -213,10 +234,26 @@ export const ReportsView: React.FC = () => {
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
                 {t('description')}
               </label>
-              <div className="p-4 rounded-2xl bg-[#041820] border border-cyan-500/20 text-slate-100 text-sm leading-relaxed">
-                "{selectedReport.description}"
-              </div>
+              <TranslateControl
+                text={selectedReport.description}
+                language={language}
+                full
+                className="p-4 rounded-2xl bg-[#041820] border border-cyan-500/20 text-slate-100 text-sm leading-relaxed"
+              />
             </div>
+
+            {proof && (
+              <div className="space-y-1.5 mb-5">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                  {language === 'ar' ? 'صورة الحادثة' : 'Incident photo'}
+                </label>
+                <img src={proof.photo} alt="" className="max-h-72 w-full rounded-2xl border border-cyan-500/20 object-cover" />
+                <p className="text-[11px] font-bold text-cyan-200">
+                  {language === 'ar' ? 'وقت الالتقاط: ' : 'Captured: '}
+                  {new Date(proof.capturedAt).toLocaleString(language === 'ar' ? 'ar' : 'en')}
+                </p>
+              </div>
+            )}
 
             {/* Location Map View if available (Screen 12) */}
             {selectedReport.hasLocation && (

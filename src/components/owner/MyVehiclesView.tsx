@@ -13,6 +13,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Vehicle } from '../../types';
+import { QuickReturn } from '../common/QuickReturn';
 
 export const MyVehiclesView: React.FC = () => {
   const {
@@ -138,6 +139,10 @@ export const MyVehiclesView: React.FC = () => {
                     <p className="text-base font-extrabold mt-0.5 text-cyan-300">{v.reportsCount || 0}</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="mb-4">
+                <QuickReturn vehicle={v} />
               </div>
 
               {/* Actions Footer */}

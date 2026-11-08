@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { AppView } from '../../types';
 import logo from '../../assets/logo.png';
+import { PhoneAlertButton } from './PhoneAlertButton';
 
 interface OwnerLayoutProps {
   children: React.ReactNode;
@@ -258,6 +259,9 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
             </button>
           </div>
         </header>
+        <div className={`border-b px-4 py-2 sm:px-8 ${theme === 'dark' ? 'border-cyan-950 bg-[#061820]' : 'border-slate-200 bg-white'}`}>
+          <PhoneAlertButton compact />
+        </div>
         {menuOpen && (
           <nav className={`md:hidden border-b px-3 py-2 space-y-1 ${
             theme === 'dark' ? 'bg-[#061820] border-cyan-950' : 'bg-white border-slate-200'

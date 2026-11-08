@@ -61,6 +61,7 @@ export interface Vehicle {
   reportsCount: number;
   imageUrl?: string;
   createdAt: string;
+  returnAt?: string;
 }
 
 export type ReportCategory = 
@@ -86,7 +87,13 @@ export interface Report {
   vehiclePlate: string;
   category: ReportCategory;
   title: string;
+  titleTranslation?: string;
+  titleSourceLang?: Language;
+  titleTargetLang?: Language;
   description: string;
+  translation?: string;
+  sourceLang?: Language;
+  targetLang?: Language;
   location?: ReportLocation;
   hasLocation: boolean;
   status: ReportStatus;
@@ -103,6 +110,9 @@ export interface ChatMessage {
   senderRole: 'owner' | 'reporter';
   senderName: string;
   text: string;
+  translation?: string;
+  sourceLang?: Language;
+  targetLang?: Language;
   timestamp: string;
   createdAt: string;
   isRead: boolean;
@@ -115,6 +125,9 @@ export interface Conversation {
   vehicleName: string;
   vehiclePlate: string;
   lastMessage: string;
+  lastMessageTranslation?: string;
+  lastMessageSource?: Language;
+  lastMessageTarget?: Language;
   lastMessageTime: string;
   unreadCount: number;
   side?: 'owner' | 'reporter';
@@ -128,7 +141,7 @@ export interface AppNotification {
   userId: string;
   vehicleId?: string;
   reportId?: string;
-  type: 'new_report' | 'lights_warning' | 'report_resolved' | 'qr_scanned' | 'chat_message' | 'system';
+  type: 'new_report' | 'lights_warning' | 'report_resolved' | 'qr_scanned' | 'chat_message' | 'voice_call' | 'system';
   title: string;
   message: string;
   timeAgo: string;

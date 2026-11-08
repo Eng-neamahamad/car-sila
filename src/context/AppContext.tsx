@@ -52,7 +52,7 @@ interface AppContextType {
   login: (email: string, password: string) => void;
   loginAdmin: (password: string) => Promise<void>;
   loginWithGoogle: (credential: string) => void;
-  register: (name: string, email: string, password: string, phone?: string) => void;
+  register: (name: string, email: string, password: string, phone: string) => void;
   updateProfile: (name: string, email: string) => void;
   logout: () => void;
   allUsers: User[];
@@ -76,6 +76,7 @@ interface AppContextType {
   clearAllVehicles: () => void;
   updateVehicleStatus: (id: string, status: Vehicle['status']) => void;
   regenerateQRToken: (id: string) => void;
+  setQuickReturn: (id: string, minutes: number) => Promise<void>;
 
   // Visitor QR Scan flow
   activeScanVehicle: Vehicle | null;
@@ -87,6 +88,7 @@ interface AppContextType {
     description: string;
     hasLocation: boolean;
     locationName?: string;
+    photo?: string;
   }) => Promise<Report>;
   lastSubmittedReport: Report | null;
 
@@ -412,12 +414,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       invalid_input: ['البيانات المدخلة غير صالحة', 'The entered details are not valid'],
       invalid_email: ['البريد لازم يكون فيه @ مثل name@gmail.com', 'The email needs an @ sign, like name@gmail.com'],
       short_password: ['كلمة المرور لازم تكون 6 أحرف على الأقل', 'The password must be at least 6 characters'],
+      invalid_phone: ['رقم الجوال مطلوب', 'A phone number is required'],
       google_failed: ['تعذر التحقق من حساب Google', 'Google could not be verified'],
       admin_google: ['حساب المسؤول يدخل من البريد وكلمة المرور فقط', 'The administrator signs in with email and password only'],
       plate_taken: ['رقم اللوحة مسجّل من قبل', 'This plate is already registered'],
       invalid_plate: ['رقم اللوحة لازم يكون من 3 إلى 15 حرفاً أو رقماً، بدون رموز مثل ! @ #', 'The plate must be 3 to 15 letters or numbers, without symbols such as ! @ #'],
       invalid_brand: ['اختَر ماركة من القائمة، أو اكتب الماركة في خيار أخرى', 'Choose a brand from the list, or type one under Other'],
-      vehicle_limit: ['كل حساب يقدر يسجّل 10 سيارات كحد أقصى', 'Each account can register up to 10 vehicles']
+      vehicle_limit: ['كل حساب يقدر يسجّل 10 سيارات كحد أقصى', 'Each account can register up to 10 vehicles'],
+      schema_missing: ['جداول قاعدة البيانات مش منشأة بعد. من Supabase افتح SQL Editor، الصق ملف server/schema.sql كامل، واضغط Run.', 'The database tables are not created yet. In Supabase open SQL Editor, paste all of server/schema.sql, and press Run.'],
+      bad_database_key: ['مفتاح قاعدة البيانات على Vercel غير صحيح. افتح Environment Variables وتأكد من SUPABASE_SERVICE_ROLE_KEY ثم أعد النشر.', 'The database key on Vercel is wrong. Check SUPABASE_SERVICE_ROLE_KEY in Environment Variables, then redeploy.'],
+      bad_database_url: ['عنوان قاعدة البيانات على Vercel غير صحيح. تأكد من SUPABASE_URL ثم أعد النشر.', 'The database address on Vercel is wrong. Check SUPABASE_URL, then redeploy.'],
+      own_vehicle: ['ما بتقدر تتصل بسيارتك من نفس الحساب', 'You cannot call your own car from this account'],
+      call_busy: ['في اتصال طارئ قائم على هذه السيارة', 'An emergency call is already open for this car']
     };
     const pair = messages[code] || ['تعذر حفظ العملية', 'The action could not be saved'];
     showToast(language === 'ar' ? pair[0] : pair[1], 'error');
@@ -539,7 +547,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       openSession(data);
     });
 
-  const register = (name: string, email: string, password: string, phone?: string) => {
+  const register = (name: string, email: string, password: string, phone: string) => {
     const normalized = email.trim().toLowerCase();
     if (normalized === ADMIN_EMAIL || knownEmails.current.has(normalized)) {
       explain(new ApiError(normalized === ADMIN_EMAIL ? 'reserved_email' : 'email_taken'));
@@ -661,6 +669,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .catch(explain);
   };
 
+  const setQuickReturn = async (id: string, minutes: number) => {
+    try {
+      applyWorkspace(await api<Workspace>('/api/vehicles/return', { id, minutes }));
+    } catch (error) {
+      explain(error);
+    }
+  };
+
   const regenerateQRToken = (id: string) => {
     api<Workspace>('/api/vehicles/token', { id })
       .then((data) => {
@@ -690,7 +706,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         token,
         category: data.category,
         title: data.title,
-        description: data.description
+        description: data.description,
+        photo: data.photo
       });
       const workspace = await api<Workspace>('/api/bootstrap');
       applyWorkspace(workspace);
@@ -848,6 +865,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         clearAllVehicles,
         updateVehicleStatus,
         regenerateQRToken,
+        setQuickReturn,
 
         activeScanVehicle,
         setActiveScanVehicle,

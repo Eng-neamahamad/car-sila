@@ -119,6 +119,44 @@ create index if not exists notifications_user_idx on notifications(user_id);
 create index if not exists activities_vehicle_idx on activities(vehicle_id);
 create index if not exists sessions_user_idx on sessions(user_id);
 
+alter table vehicles add column if not exists return_at timestamptz;
+
+create table if not exists calls (
+  id text primary key,
+  vehicle_id text not null references vehicles(id) on delete cascade,
+  owner_id text not null references accounts(id) on delete cascade,
+  visit_id text not null,
+  status text not null,
+  offer text,
+  answer text,
+  visitor_ice text not null default '[]',
+  owner_ice text not null default '[]',
+  plate text not null,
+  car text not null,
+  created_at timestamptz not null,
+  updated_at timestamptz not null
+);
+
+create table if not exists report_photos (
+  report_id text primary key references reports(id) on delete cascade,
+  photo text not null,
+  captured_at timestamptz not null
+);
+
+create index if not exists calls_owner_idx on calls(owner_id);
+create index if not exists calls_vehicle_idx on calls(vehicle_id);
+create index if not exists calls_visit_idx on calls(visit_id);
+
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  user_id text not null references accounts(id) on delete cascade,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null
+);
+
+create index if not exists push_subscriptions_user_idx on push_subscriptions(user_id);
+
 alter table accounts enable row level security;
 alter table vehicles enable row level security;
 alter table reports enable row level security;
@@ -128,6 +166,9 @@ alter table notifications enable row level security;
 alter table activities enable row level security;
 alter table sessions enable row level security;
 alter table visits enable row level security;
+alter table calls enable row level security;
+alter table report_photos enable row level security;
+alter table push_subscriptions enable row level security;
 
 grant usage on schema public to service_role;
 grant select, insert, update, delete on all tables in schema public to service_role;
