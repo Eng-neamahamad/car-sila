@@ -22,6 +22,7 @@ import { NotificationsView } from './components/owner/NotificationsView';
 import { ActivityView } from './components/owner/ActivityView';
 import { SettingsView } from './components/owner/SettingsView';
 import { SosView } from './components/sos/SosView';
+import { SosAlarm } from './components/sos/SosAlarm';
 
 // Admin Portal
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -195,6 +196,7 @@ const AppContent: React.FC = () => {
       {/* Global Add Vehicle Modal */}
       <AddVehicleModal />
       <IncomingCall />
+      <SosAlarm />
 
       {pings.length > 0 && (
         <div className="fixed top-20 left-1/2 z-[60] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col gap-2">

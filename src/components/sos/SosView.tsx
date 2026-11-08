@@ -127,7 +127,7 @@ export const SosView: React.FC = () => {
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || 'sos_unavailable');
     setData(body);
-    setError('');
+    if (body.mine) setError('');
   };
 
   useEffect(() => {
@@ -158,11 +158,14 @@ export const SosView: React.FC = () => {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(explain(payload.error));
-        return;
+        return false;
       }
       setData(payload);
+      setError('');
+      return true;
     } catch {
       setError(text.unavailable);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -173,6 +176,9 @@ export const SosView: React.FC = () => {
       await post('/api/sos/help', { active: false });
       return;
     }
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => undefined);
+    }
     try {
       const where = await locate();
       await post('/api/sos/help', { active: true, ...where });
@@ -182,13 +188,16 @@ export const SosView: React.FC = () => {
   };
 
   const sendCall = async () => {
+    let where;
     try {
-      const where = await locate();
-      await post('/api/sos/request', { kind, note, ...where });
-      setNote('');
+      where = await locate();
     } catch {
       setError(text.location);
+      return;
     }
+    const saved = await post('/api/sos/request', { kind, note, ...where })
+      || await post('/api/sos/request', { kind, note, ...where });
+    if (saved) setNote('');
   };
 
   const sendMessage = async (id: string) => {
