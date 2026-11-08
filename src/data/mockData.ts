@@ -26,7 +26,7 @@ export const initialUsers: User[] = [
   {
     id: 'usr_admin',
     name: 'مدير المنصة',
-    email: 'admin@carsila.com',
+    email: 'admin@example.com',
     role: 'admin',
     privacySetting: 'high',
     notificationsEnabled: true,

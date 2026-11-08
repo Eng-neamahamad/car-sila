@@ -8,8 +8,8 @@ import { sendReportEmail } from './mail.js';
 import { cachedReturn, incomingCalls, ownerSignal, readPhoto, savePhoto, saveReturn, startCall, visitorCall, visitorHangup, visitorIce, ownerCall } from './safety.js';
 import { unpackText } from './translate.js';
 
-export const ADMIN_EMAIL = 'admin@carsila.com';
-const ADMIN_PASSWORD = 'Admin@2026';
+export const adminEmail = () => setting('ADMIN_EMAIL').toLowerCase();
+const adminPassword = () => setting('ADMIN_PASSWORD');
 const CATEGORIES = new Set(['blocking', 'lights', 'accident', 'lost_item', 'contact', 'other']);
 
 let client;
@@ -354,7 +354,7 @@ export const workspaceFor = async (account, visitId) => {
       supabase().from('vehicles').select('*'),
       supabase().from('reports').select('*'),
       supabase().from('conversations').select('*'),
-      supabase().from('notifications').select('*'),
+      supabase().from('notifications').select('*').order('created_at', { ascending: false }),
       supabase().from('activities').select('*'),
       supabase().from('accounts').select('*')
     ]);
@@ -381,7 +381,7 @@ export const workspaceFor = async (account, visitId) => {
   const [reports, ownedConversationRows, notifications, activities, visitConversationRows] = await Promise.all([
     ids.length ? supabase().from('reports').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] }),
     ids.length ? supabase().from('conversations').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] }),
-    supabase().from('notifications').select('*').eq('user_id', account.id),
+    supabase().from('notifications').select('*').eq('user_id', account.id).order('created_at', { ascending: false }),
     ids.length ? supabase().from('activities').select('*').in('vehicle_id', ids) : Promise.resolve({ data: [] }),
     visitId
       ? supabase().from('conversations').select('*').eq('reporter_session_id', visitId)
@@ -809,8 +809,8 @@ export const updateProfile = async (account, input) => {
   const name = cleanText(input.name, 80);
   const email = cleanText(input.email, 120).toLowerCase();
   if (!name || !email || !email.includes('@')) return { error: 'invalid_input' };
-  if (account.role === 'admin' && email !== ADMIN_EMAIL) return { error: 'reserved_email' };
-  if (account.role !== 'admin' && email === ADMIN_EMAIL) return { error: 'reserved_email' };
+  if (account.role === 'admin' && email !== adminEmail()) return { error: 'reserved_email' };
+  if (account.role !== 'admin' && adminEmail() && email === adminEmail()) return { error: 'reserved_email' };
   const taken = await accountByEmail(email);
   if (taken && taken.id !== account.id) return { error: 'email_taken' };
   must(await supabase().from('accounts').update({ name, email }).eq('id', account.id));
@@ -849,7 +849,7 @@ export const registerAccount = async ({ name, email, password, phone }) => {
   if (String(password || '').length < 6) return { error: 'short_password' };
   const cleanPhone = cleanText(phone, 20);
   if (!cleanPhone) return { error: 'invalid_phone' };
-  if (cleanEmail === ADMIN_EMAIL) return { error: 'reserved_email' };
+  if (adminEmail() && cleanEmail === adminEmail()) return { error: 'reserved_email' };
   if (await accountByEmail(cleanEmail)) return { error: 'email_taken' };
   const account = {
     id: `usr_${randomUUID()}`,
@@ -908,8 +908,9 @@ export const loginAccount = async (email, password) => {
 };
 
 export const loginAdmin = async (password) => {
-  const admin = await accountByEmail(ADMIN_EMAIL);
-  const accepted = !!admin && admin.status === 'active' && verifyPassword(String(password || ''), admin.passwordHash);
+  const email = adminEmail();
+  const admin = email ? await accountByEmail(email) : null;
+  const accepted = !!admin && admin.role === 'admin' && admin.status === 'active' && verifyPassword(String(password || ''), admin.passwordHash);
   if (!accepted) {
     await recordFailedLogin('admin');
     return { error: 'invalid_credentials' };
@@ -919,7 +920,7 @@ export const loginAdmin = async (password) => {
 
 export const loginGoogleAccount = async ({ email, name }) => {
   const cleanEmail = cleanText(email, 120).toLowerCase();
-  if (!cleanEmail || cleanEmail === ADMIN_EMAIL) return { error: 'admin_google' };
+  if (!cleanEmail || (adminEmail() && cleanEmail === adminEmail())) return { error: 'admin_google' };
   const existing = await accountByEmail(cleanEmail);
   if (existing) {
     if (existing.status !== 'active') return { error: 'suspended' };
@@ -1017,18 +1018,24 @@ const importLocalSnapshot = async () => {
 };
 
 export const loadDatabase = async () => {
-  const admin = await accountByEmail(ADMIN_EMAIL);
-  if (!admin) {
-    await insertAccount({
-      id: `usr_${randomUUID()}`,
-      name: 'CAR-SILA Admin',
-      email: ADMIN_EMAIL,
-      passwordHash: hashPassword(ADMIN_PASSWORD),
-      role: 'admin',
-      status: 'active',
-      createdAt: '2025-01-01',
-      avatar: ''
-    });
+  const email = adminEmail();
+  const password = adminPassword();
+  if (email && password) {
+    const admin = await accountByEmail(email);
+    if (!admin) {
+      await insertAccount({
+        id: `usr_${randomUUID()}`,
+        name: 'CAR-SILA Admin',
+        email,
+        passwordHash: hashPassword(password),
+        role: 'admin',
+        status: 'active',
+        createdAt: '2025-01-01',
+        avatar: ''
+      });
+    } else if (admin.role === 'admin' && !verifyPassword(password, admin.passwordHash)) {
+      must(await supabase().from('accounts').update({ password_hash: hashPassword(password) }).eq('id', admin.id));
+    }
   }
   await importLocalSnapshot();
 };

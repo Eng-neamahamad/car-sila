@@ -138,23 +138,6 @@ export const Navbar: React.FC = () => {
             <button
               onClick={() => {
                 const scrollToSection = () => {
-                  const el = document.getElementById('pricing-section');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                };
-                if (currentView !== 'landing') {
-                  setCurrentView('landing');
-                  setTimeout(scrollToSection, 100);
-                } else {
-                  scrollToSection();
-                }
-              }}
-              className="hover:text-cyan-400 transition-colors cursor-pointer"
-            >
-              {t('pricing')}
-            </button>
-            <button
-              onClick={() => {
-                const scrollToSection = () => {
                   const el = document.getElementById('contact-section');
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 };
@@ -281,7 +264,6 @@ export const Navbar: React.FC = () => {
             { label: t('home'), run: () => scrollTo() },
             { label: t('howItWorks'), run: () => scrollTo('how-it-works-section') },
             { label: t('features'), run: () => scrollTo('features-section') },
-            { label: t('pricing'), run: () => scrollTo('pricing-section') },
             { label: t('contact'), run: () => scrollTo('contact-section') },
           ].map((item) => (
             <button

@@ -3,9 +3,6 @@ import { ActivityEvent, AppNotification, AppView, Conversation, Report, User, Ve
 export const DB_KEY = 'carsila_db';
 export const SESSION_KEY = 'carsila_session';
 export const VIEW_KEY = 'carsila_view';
-export const ADMIN_EMAIL = 'admin@carsila.com';
-const ADMIN_PASSWORD = 'Admin@2026';
-
 export type StoredAccount = {
   id: string;
   name: string;
@@ -83,19 +80,8 @@ export const toPublicUser = (account: StoredAccount): User => ({
   vehiclesCount: 0
 });
 
-const seedAdmin = (): StoredAccount => ({
-  id: 'usr_admin_1',
-  name: 'CAR-SILA Admin',
-  email: ADMIN_EMAIL,
-  password: ADMIN_PASSWORD,
-  role: 'admin',
-  status: 'active',
-  createdAt: '2025-01-01',
-  avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80'
-});
-
 const emptyDatabase = (): AppDatabase => ({
-  accounts: [seedAdmin()],
+  accounts: [],
   vehicles: [],
   reports: [],
   conversations: [],
@@ -121,7 +107,7 @@ const normalize = (db: AppDatabase): AppDatabase => {
     .map((account) => ({
       ...account,
       email: account.email.trim(),
-      role: account.email.trim().toLowerCase() === ADMIN_EMAIL ? 'admin' as const : 'owner' as const,
+      role: account.role === 'admin' ? 'admin' as const : 'owner' as const,
       status: account.status === 'inactive' ? 'inactive' as const : 'active' as const,
       password: account.password || ''
     }))
@@ -131,10 +117,6 @@ const normalize = (db: AppDatabase): AppDatabase => {
       seenEmails.add(key);
       return true;
     });
-
-  if (!accounts.some((account) => account.email.toLowerCase() === ADMIN_EMAIL)) {
-    accounts.unshift(seedAdmin());
-  }
 
   return {
     accounts,

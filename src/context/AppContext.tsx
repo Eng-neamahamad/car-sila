@@ -15,7 +15,6 @@ import {
 import { api, ApiError, toVisitorVehicle, Workspace } from '../data/api';
 import { translations } from '../data/translations';
 import {
-  ADMIN_EMAIL,
   StoredAccount,
   isAdminView,
   isAppView,
@@ -258,8 +257,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (hash.replace(/^#/, '') === 'admin') {
         const view = viewRef.current;
-        if (view === 'login' || view === 'register') return;
-        setViewState('admin-login');
+        if (view === 'login' || view === 'register' || isAdminView(view)) return;
+        setViewState('login');
         return;
       }
 
@@ -395,7 +394,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const signingIn = view === 'login' || view === 'register';
       if (!signingIn && data.user?.role === 'admin' && pending && isAppView(pending) && isAdminView(pending)) return pending;
       if (!data.user && (isOwnerView(view) || isAdminView(view))) {
-        return window.location.hash.replace(/^#/, '') === 'admin' ? 'admin-login' : 'landing';
+        return 'landing';
       }
       return view;
     });
@@ -483,11 +482,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       }
     }
-    if (view === 'admin-login') {
-      setViewState(role === 'admin' ? 'admin-overview' : 'admin-login');
-      return;
-    }
-    if (isAdminView(view) && role !== 'admin') {
+    if (view === 'admin-login' || (isAdminView(view) && role !== 'admin')) {
+      if (role === 'admin') {
+        setViewState('admin-overview');
+        return;
+      }
       if (role === 'owner') {
         showToast(
           language === 'ar' ? 'لوحة الإدارة متاحة للمسؤول فقط' : 'The admin panel is only available to the administrator',
@@ -496,7 +495,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setViewState('dashboard');
         return;
       }
-      setViewState('admin-login');
+      setViewState('login');
       return;
     }
     if (isOwnerView(view) && role !== 'owner') {
@@ -549,8 +548,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const register = (name: string, email: string, password: string, phone: string) => {
     const normalized = email.trim().toLowerCase();
-    if (normalized === ADMIN_EMAIL || knownEmails.current.has(normalized)) {
-      explain(new ApiError(normalized === ADMIN_EMAIL ? 'reserved_email' : 'email_taken'));
+    if (knownEmails.current.has(normalized)) {
+      explain(new ApiError('email_taken'));
       return;
     }
     knownEmails.current.add(normalized);
@@ -767,11 +766,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ? conversations.filter((conversation) =>
         conversation.side === 'reporter' || ownerVehicleIds.has(conversation.vehicleId))
     : conversations;
-  const visibleNotifications = currentUser?.role === 'admin'
+  const newestFirst = (items: AppNotification[]) =>
+    [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const visibleNotifications = newestFirst(currentUser?.role === 'admin'
     ? notifications
     : currentUser
     ? notifications.filter((item) => item.userId === currentUser.id)
-    : [];
+    : []);
   const visibleActivities = currentUser?.role === 'admin'
     ? activities
     : currentUser

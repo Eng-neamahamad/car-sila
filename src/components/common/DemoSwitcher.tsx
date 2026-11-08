@@ -89,8 +89,7 @@ export const DemoSwitcher: React.FC = () => {
   };
 
   const handleSwitchToAdmin = () => {
-    login('admin@carsila.com', 'admin');
-    setCurrentView('admin-overview');
+    setCurrentView('login');
     showToast(
       language === 'ar' ? 'تم التبديل إلى لوحة إدارة المشرف 🛡️' : 'Switched to Admin Panel 🛡️',
       'info'
@@ -156,7 +155,9 @@ export const DemoSwitcher: React.FC = () => {
                           key={item.id}
                           onClick={() => {
                             if (item.group === 'Admin Panel') {
-                              login('admin@carsila.com', 'admin');
+                              setCurrentView('login');
+                              setIsOpen(false);
+                              return;
                             } else if (item.group === 'Owner Portal') {
                               login('user@carsila.com', 'owner');
                             } else if (item.id === 'qr-scan-flow' && vehicles.length > 0) {

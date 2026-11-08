@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { ApiError } from '../../data/api';
 import { enablePhoneAlert, phoneAlertReady } from '../../lib/phoneAlert';
 
 export const PhoneAlertButton: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
@@ -8,6 +9,7 @@ export const PhoneAlertButton: React.FC<{ compact?: boolean }> = ({ compact = fa
   const ar = language === 'ar';
   const [state, setState] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
 
   useEffect(() => {
     let gone = false;
@@ -21,10 +23,15 @@ export const PhoneAlertButton: React.FC<{ compact?: boolean }> = ({ compact = fa
 
   const enable = async () => {
     setBusy(true);
+    setProblem('');
     try {
       setState(await enablePhoneAlert());
-    } catch {
+    } catch (error) {
       setState('default');
+      const unavailable = error instanceof ApiError && error.code === 'push_unavailable';
+      setProblem(unavailable
+        ? (ar ? 'الرنين غير جاهز على السيرفر. مفاتيح التنبيه غير مضبوطة بعد.' : 'Phone alerts are not ready on the server yet. The alert keys are missing.')
+        : (ar ? 'تعذر تفعيل الرنين. اسمح بالإشعارات ثم أعد المحاولة.' : 'The alert could not be turned on. Allow notifications and try again.'));
     } finally {
       setBusy(false);
     }
@@ -49,6 +56,7 @@ export const PhoneAlertButton: React.FC<{ compact?: boolean }> = ({ compact = fa
   return (
     <div className={compact ? 'flex flex-col gap-2 sm:flex-row sm:items-center' : 'space-y-3'}>
       <p className="text-[11px] leading-relaxed text-slate-300">{note}</p>
+      {problem && <p className="text-[11px] font-bold text-rose-300">{problem}</p>}
       {state !== 'unsupported' && state !== 'denied' && (
         <button
           type="button"

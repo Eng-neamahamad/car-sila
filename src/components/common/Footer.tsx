@@ -74,11 +74,6 @@ export const Footer: React.FC = () => {
               </button>
             </li>
             <li>
-              <button onClick={() => handleNavClick('pricing-section')} className="hover:text-cyan-300 transition-colors cursor-pointer">
-                {t('pricing')}
-              </button>
-            </li>
-            <li>
               <button onClick={() => handleNavClick('contact-section')} className="hover:text-cyan-300 transition-colors cursor-pointer">
                 {t('contact')}
               </button>

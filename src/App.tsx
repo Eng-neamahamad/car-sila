@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
@@ -32,6 +32,54 @@ import { AdminVehiclesView } from './components/admin/AdminVehiclesView';
 import { AdminReportsView } from './components/admin/AdminReportsView';
 import { AdminSecurityView } from './components/admin/AdminSecurityView';
 import { AdminLoginView } from './components/admin/AdminLoginView';
+
+const FREE_MONTH_KEY = 'carsila_free_month_seen';
+
+const FreeMonthNotice: React.FC = () => {
+  const { language } = useApp();
+  const [open, setOpen] = useState(false);
+  const arabic = language === 'ar';
+
+  useEffect(() => {
+    if (sessionStorage.getItem(FREE_MONTH_KEY) === '1') return;
+    setOpen(true);
+  }, []);
+
+  const close = () => {
+    sessionStorage.setItem(FREE_MONTH_KEY, '1');
+    setOpen(false);
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4" onClick={close}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-3xl border border-cyan-400/40 bg-[#041018] p-6 text-center text-white shadow-2xl shadow-cyan-500/20 sm:p-8"
+      >
+        <p className="text-xs font-bold text-cyan-300">{arabic ? 'CAR-SILA' : 'CAR-SILA'}</p>
+        <h2 className="mt-3 text-2xl font-black">
+          {arabic ? 'الاستخدام مجاني لشهر' : 'Use is free for one month'}
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+          {arabic
+            ? 'جرّب الموقع شهراً كاملاً بدون رسوم. بعد ذلك الاشتراك 5 دولارات شهرياً.'
+            : 'Try the site for a full month at no charge. After that, the subscription is $5 a month.'}
+        </p>
+        <button
+          type="button"
+          onClick={close}
+          className="mt-6 w-full cursor-pointer rounded-xl bg-cyan-500 py-3 text-sm font-black text-[#041018] hover:bg-cyan-400"
+        >
+          {arabic ? 'حسناً' : 'OK'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const AppContent: React.FC = () => {
   const { currentView, toasts, pings, language, theme } = useApp();
@@ -197,6 +245,7 @@ const AppContent: React.FC = () => {
       <AddVehicleModal />
       <IncomingCall />
       <SosAlarm />
+      <FreeMonthNotice />
 
       {pings.length > 0 && (
         <div className="fixed top-20 left-1/2 z-[60] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col gap-2">

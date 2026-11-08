@@ -10,7 +10,7 @@ import { translateInto } from './translate.js';
 import {
   accountForSession,
   addVehicle,
-  ADMIN_EMAIL,
+  adminEmail,
   clearOwnVehicles,
   createSession,
   deleteSession,
@@ -213,11 +213,16 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const result = await loginAccount(email, req.body?.password);
     if (result.error) {
       if (result.error === 'invalid_credentials' || result.error === 'suspended') {
-        await recordFailedLogin(email === ADMIN_EMAIL ? 'admin' : result.error === 'suspended' ? 'suspended' : 'account');
+        await recordFailedLogin(email === adminEmail() ? 'admin' : result.error === 'suspended' ? 'suspended' : 'account');
       }
       return res.status(401).json({ error: result.error });
     }
-    await setSession(res, result.account);
+    if (result.account.role === 'admin') {
+      const eightHours = 8 * 60 * 60 * 1000;
+      res.cookie('carsila_sid', await createSession(result.account.id, eightHours), { ...cookieOptions, maxAge: eightHours });
+    } else {
+      await setSession(res, result.account);
+    }
     await sendWorkspace(res, result.account, currentVisit(req));
   } catch (error) {
     fail(res, error);
@@ -247,7 +252,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
     if (!payload?.email || payload.email_verified === false) {
       return res.status(401).json({ error: 'google_failed' });
     }
-    if (payload.email.toLowerCase() === ADMIN_EMAIL) {
+    if (adminEmail() && payload.email.toLowerCase() === adminEmail()) {
       return res.status(403).json({ error: 'admin_google' });
     }
     const result = await loginGoogleAccount({ email: payload.email, name: payload.name || '' });

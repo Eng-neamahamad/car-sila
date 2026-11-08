@@ -54,7 +54,7 @@ const ready = () => {
   const privateKey = setting('VAPID_PRIVATE_KEY');
   if (!publicKey || !privateKey) return false;
   if (!configured) {
-    pushLibrary().setVapidDetails(setting('VAPID_SUBJECT') || 'mailto:admin@carsila.com', publicKey, privateKey);
+    pushLibrary().setVapidDetails(setting('VAPID_SUBJECT') || 'mailto:carsila@localhost', publicKey, privateKey);
     configured = true;
   }
   return true;
