@@ -301,7 +301,7 @@ app.post('/api/public/reports', reportLimiter, async (req, res) => {
 const openVisit = async (req, res) => {
   const visitId = await ensureVisit(currentVisit(req));
   if (visitId !== currentVisit(req)) {
-    res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: 12 * 60 * 60 * 1000 });
+    res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
   }
   return visitId;
 };

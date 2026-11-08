@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
+import { InstallBar } from './components/common/InstallBar';
 import { Footer } from './components/common/Footer';
 import { PrintQRModal } from './components/common/PrintQRModal';
 import { AddVehicleModal } from './components/common/AddVehicleModal';
@@ -246,6 +247,7 @@ const AppContent: React.FC = () => {
       <IncomingCall />
       <SosAlarm />
       <FreeMonthNotice />
+      <InstallBar />
 
       {pings.length > 0 && (
         <div className="fixed top-20 left-1/2 z-[60] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col gap-2">

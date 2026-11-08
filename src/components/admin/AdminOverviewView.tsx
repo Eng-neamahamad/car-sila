@@ -88,19 +88,24 @@ export const AdminOverviewView: React.FC = () => {
   const [openCalls, setOpenCalls] = useState(0);
   useEffect(() => {
     let stop = false;
+    let timer = 0;
     const load = () => {
       fetch('/api/sos/summary', { credentials: 'include' })
-        .then((response) => response.ok ? response.json() : { open: 0 })
+        .then((response) => {
+          if (!response.ok) return null;
+          return response.json();
+        })
         .then((body) => {
-          if (!stop) setOpenCalls(Number(body.open) || 0);
+          if (stop || !body) return;
+          setOpenCalls(Number(body.open) || 0);
+          timer = window.setTimeout(load, 60000);
         })
         .catch(() => undefined);
     };
     load();
-    const timer = window.setInterval(load, 15000);
     return () => {
       stop = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
   }, []);
   const arabic = language === 'ar';
