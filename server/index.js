@@ -5,7 +5,7 @@ import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { OAuth2Client } from 'google-auth-library';
 import helmet from 'helmet';
-import { pushPublicKey, removePushSubscription, savePushSubscription } from './push.js';
+import { pushPublicKey, removePushSubscription, savePushSubscription, sendPush } from './push.js';
 import { translateInto } from './translate.js';
 import {
   accountForSession,
@@ -148,6 +148,15 @@ const callLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => `${clientAddress(req)}:call`,
+  handler: (_req, res) => res.status(429).json({ error: 'rate_limited' })
+});
+
+const iceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 180,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${clientAddress(req)}:ice`,
   handler: (_req, res) => res.status(429).json({ error: 'rate_limited' })
 });
 
@@ -330,7 +339,7 @@ app.get('/api/public/calls', async (req, res) => {
   }
 });
 
-app.post('/api/public/calls/ice', callLimiter, async (req, res) => {
+app.post('/api/public/calls/ice', iceLimiter, async (req, res) => {
   try {
     const result = await visitorCallIce(req.body?.id, currentVisit(req), req.body?.candidate);
     if (result.error) return res.status(result.error === 'ended' ? 409 : 403).json({ error: result.error });
@@ -632,6 +641,14 @@ app.post('/api/push/subscribe', async (req, res) => {
     }
     const result = await savePushSubscription(account.id, req.body || {});
     if (result.error) return res.status(400).json({ error: result.error });
+    if (req.body?.announce === true) {
+      await sendPush(account.id, {
+        title: 'CAR-SILA',
+        body: 'التنبيهات صارت شغالة. البلاغ والمكالمة بيوصلوا حتى والتطبيق مقفّل.',
+        url: '/',
+        tag: `push-ready-${account.id}`
+      }).catch((error) => console.error(error));
+    }
     res.json(result);
   } catch (error) {
     fail(res, error);

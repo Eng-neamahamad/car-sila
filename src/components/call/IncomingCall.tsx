@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { api } from '../../data/api';
 import { useApp } from '../../context/AppContext';
-import { addIce, AudioPeer, CallView, startPeer } from './peer';
+import { addIce, AudioPeer, CallView, startPeer, waitForIce } from './peer';
+import { showPhoneNotice } from '../../lib/phoneAlert';
 
 export const IncomingCall: React.FC = () => {
   const { currentUser, language } = useApp();
@@ -45,6 +46,38 @@ export const IncomingCall: React.FC = () => {
       navigator.serviceWorker?.removeEventListener('message', onMessage);
     };
   }, [currentUser?.role]);
+
+  useEffect(() => {
+    if (!call?.id || phase !== 'incoming') return;
+    const id = call.id;
+    const car = call.car;
+    void showPhoneNotice(
+      ar ? 'اتصال صوتي' : 'Voice call',
+      ar ? `${car} يطلب التحدث معك. الإشعار يبقى لحد ما تشيله.` : `${car} wants to talk. The alert stays until you dismiss it.`,
+      `/?call=${encodeURIComponent(id)}`,
+      `call-${id}`
+    );
+    const context = new AudioContext();
+    let stopped = false;
+    const beep = () => {
+      if (stopped || context.state === 'closed') return;
+      const tone = context.createOscillator();
+      const gain = context.createGain();
+      tone.frequency.value = 880;
+      gain.gain.setValueAtTime(0.05, context.currentTime);
+      tone.connect(gain);
+      gain.connect(context.destination);
+      tone.start();
+      tone.stop(context.currentTime + 0.35);
+    };
+    void context.resume().then(beep).catch(() => undefined);
+    const timer = window.setInterval(() => void context.resume().then(beep).catch(() => undefined), 1400);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      void context.close().catch(() => undefined);
+    };
+  }, [ar, call?.id, call?.car, phase]);
 
   useEffect(() => {
     if (phase !== 'live') return;
@@ -93,7 +126,8 @@ export const IncomingCall: React.FC = () => {
       await peer.pc.setRemoteDescription({ type: 'offer', sdp: call.offer || '' });
       const answer = await peer.pc.createAnswer();
       await peer.pc.setLocalDescription(answer);
-      const data = await api<{ call: CallView }>('/api/calls/signal', { id: call.id, action: 'accept', answer: answer.sdp });
+      await waitForIce(peer.pc);
+      const data = await api<{ call: CallView }>('/api/calls/signal', { id: call.id, action: 'accept', answer: peer.pc.localDescription?.sdp || answer.sdp || '' });
       peer.flush();
       await addIce(peer.pc, seenRef.current, data.call.ice);
       setPhase('live');

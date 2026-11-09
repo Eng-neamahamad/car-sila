@@ -71,6 +71,24 @@ export const startPeer = async (onIce: (candidate: string) => void): Promise<Aud
   };
 };
 
+export const waitForIce = (pc: RTCPeerConnection) => new Promise<void>((resolve) => {
+  if (pc.iceGatheringState === 'complete') {
+    resolve();
+    return;
+  }
+  const done = () => {
+    if (pc.iceGatheringState !== 'complete') return;
+    window.clearTimeout(timer);
+    pc.removeEventListener('icegatheringstatechange', done);
+    resolve();
+  };
+  const timer = window.setTimeout(() => {
+    pc.removeEventListener('icegatheringstatechange', done);
+    resolve();
+  }, 2500);
+  pc.addEventListener('icegatheringstatechange', done);
+});
+
 export const addIce = async (pc: RTCPeerConnection, seen: Set<string>, list: string[] = []) => {
   for (const raw of list) {
     if (seen.has(raw)) continue;

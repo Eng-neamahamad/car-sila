@@ -21,27 +21,47 @@ export const phoneAlertReady = async () => {
   return subscription ? 'granted' : 'default';
 };
 
-const subscribePhone = async () => {
+const subscribePhone = async (announce: boolean) => {
   const registration = await navigator.serviceWorker.register('/sw.js');
   const ready = await navigator.serviceWorker.ready;
   const { key } = await api<{ key: string }>('/api/push/key');
   const existing = await ready.pushManager.getSubscription();
-  const subscription = existing || await ready.pushManager.subscribe({
+  if (existing) await existing.unsubscribe();
+  const subscription = await ready.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: keyBytes(key)
   });
-  await api('/api/push/subscribe', subscription.toJSON());
+  await api('/api/push/subscribe', { ...subscription.toJSON(), announce });
   return registration ? 'granted' as const : 'granted' as const;
+};
+
+export const showPhoneNotice = async (title: string, body: string, url = '/', tag = `note-${Date.now()}`) => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (registration) {
+    await registration.showNotification(title, {
+      body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      silent: false,
+      data: { url }
+    });
+    return;
+  }
+  new Notification(title, { body, requireInteraction: true });
 };
 
 export const enablePhoneAlert = async () => {
   if (phoneAlertState() === 'unsupported') return 'unsupported';
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return permission;
-  return subscribePhone();
+  return subscribePhone(true);
 };
 
 export const ensurePhoneAlert = async () => {
   if (phoneAlertState() !== 'granted') return phoneAlertState();
-  return subscribePhone();
+  return subscribePhone(false);
 };

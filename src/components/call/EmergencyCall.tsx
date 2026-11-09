@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { api, ApiError } from '../../data/api';
-import { addIce, AudioPeer, CallView, startPeer } from './peer';
+import { addIce, AudioPeer, CallView, startPeer, waitForIce } from './peer';
 
 const text = (language: 'ar' | 'en', ar: string, en: string) => (language === 'ar' ? ar : en);
 
@@ -83,7 +83,8 @@ export const EmergencyCall: React.FC<{
       peerRef.current = peer;
       const offer = await peer.pc.createOffer();
       await peer.pc.setLocalDescription(offer);
-      const data = await api<{ call: CallView }>('/api/public/calls', { token, offer: offer.sdp });
+      await waitForIce(peer.pc);
+      const data = await api<{ call: CallView }>('/api/public/calls', { token, offer: peer.pc.localDescription?.sdp || offer.sdp || '' });
       callRef.current = data.call.id;
       peer.flush();
       setPhase('ringing');
@@ -97,7 +98,7 @@ export const EmergencyCall: React.FC<{
         void poll(id, current).catch(() => undefined);
       }, 1000);
       peer.pc.onconnectionstatechange = () => {
-        if (peer.pc.connectionState === 'failed' || peer.pc.connectionState === 'disconnected') finish('ended');
+        if (peer.pc.connectionState === 'failed') finish('ended');
       };
     } catch (error) {
       stop();

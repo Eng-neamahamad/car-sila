@@ -13,6 +13,7 @@ import {
   ReportStatus
 } from '../types';
 import { api, ApiError, toVisitorVehicle, Workspace } from '../data/api';
+import { showPhoneNotice } from '../lib/phoneAlert';
 import { translations } from '../data/translations';
 import {
   StoredAccount,
@@ -351,11 +352,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const arabic = languageRef.current === 'ar';
     if (freshNotices.length) {
       const item = freshNotices[freshNotices.length - 1];
-      const title = item.type === 'chat_message'
+      const title = item.type === 'voice_call'
+        ? (arabic ? 'اتصال صوتي' : 'Voice call')
+        : item.type === 'chat_message'
         ? (arabic ? 'رسالة جديدة' : 'New message')
         : (arabic ? 'بلاغ جديد' : 'New report');
       const detail = stripMail(item.message || '').slice(0, 80);
       showPing(detail ? `${title}: ${detail}` : title);
+      if (item.type !== 'voice_call') void showPhoneNotice(title, detail || title, '/', `note-${item.id}`);
       return;
     }
     if (freshMessages.length) {
