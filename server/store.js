@@ -127,9 +127,9 @@ const reportFrom = (row) => {
 
 const photoMarker = (text) => {
   const value = String(text || '');
-  const match = value.match(/\n?\[\[photo:([A-Za-z0-9_-]+)\]\]\s*$/);
+  const match = value.match(/\[\[photo:([A-Za-z0-9_-]+)\]\]/);
   return {
-    text: match ? value.slice(0, match.index).trim() : value,
+    text: value.replace(/\s*\[\[photo:[A-Za-z0-9_-]+\]\]\s*/g, ' ').replace(/\s+/g, ' ').trim(),
     photoReportId: match?.[1] || ''
   };
 };
@@ -172,19 +172,32 @@ const conversationFrom = (row, messages) => {
 };
 };
 
-const notificationFrom = (row) => ({
-  id: row.id,
-  userId: row.user_id,
-  vehicleId: row.vehicle_id || undefined,
-  reportId: row.report_id || undefined,
-  type: row.type,
-  title: row.title,
-  message: row.message,
-  timeAgo: row.time_ago,
-  createdAt: row.created_at,
-  isRead: row.is_read,
-  severity: row.severity
-});
+const callMarker = (text) => {
+  const value = String(text || '');
+  const match = value.match(/\[\[call:([A-Za-z0-9_-]+)\]\]/);
+  return {
+    text: value.replace(/\s*\[\[call:[A-Za-z0-9_-]+\]\]\s*/g, ' ').replace(/\s+/g, ' ').trim(),
+    callId: match?.[1] || ''
+  };
+};
+
+const notificationFrom = (row) => {
+  const marked = callMarker(row.message);
+  return {
+    id: row.id,
+    userId: row.user_id,
+    vehicleId: row.vehicle_id || undefined,
+    reportId: row.report_id || undefined,
+    callId: marked.callId || undefined,
+    type: row.type,
+    title: row.title,
+    message: marked.text,
+    timeAgo: row.time_ago,
+    createdAt: row.created_at,
+    isRead: row.is_read,
+    severity: row.severity
+  };
+};
 
 const activityFrom = (row) => ({
   id: row.id,
@@ -326,7 +339,7 @@ const presentConversation = (conversation, audience, vehicle, ownerName) => ({
 const unifyChats = async (rows) => {
   const groups = new Map();
   for (const row of rows || []) {
-    const key = `${row.vehicle_id}:${row.reporter_session_id}`;
+    const key = String(row.vehicle_id || row.id);
     const list = groups.get(key) || [];
     list.push(row);
     groups.set(key, list);
@@ -344,13 +357,16 @@ const unifyChats = async (rows) => {
       remove.add(extra.id);
     }
     const plain = photoMarker(String(newest?.body || keeper.last_message || '')).text;
+    const unread = list.reduce((sum, row) => sum + Number(row.unread_count || 0), 0);
     must(await supabase().from('conversations').update({
       last_message: plain || keeper.last_message,
       last_message_time: newest?.timestamp || keeper.last_message_time,
+      unread_count: unread,
       status: 'open'
     }).eq('id', keeper.id));
     keeper.last_message = plain || keeper.last_message;
     keeper.last_message_time = newest?.timestamp || keeper.last_message_time;
+    keeper.unread_count = unread;
     keeper.status = 'open';
   }
   if (remove.size) must(await supabase().from('conversations').delete().in('id', [...remove]));
@@ -753,8 +769,8 @@ export const submitReport = async (visitId, input, account) => {
     createdAt: now.toISOString()
   });
   const storedBody = photo ? `${description}\n[[photo:${reportId}]]` : description;
-  const openChats = await unifyChats(must(await supabase().from('conversations').select('*').eq('vehicle_id', vehicle.id).eq('reporter_session_id', visitId).eq('status', 'open')) || []);
-  const existing = openChats[0];
+  const openChats = await unifyChats(must(await supabase().from('conversations').select('*').eq('vehicle_id', vehicle.id)) || []);
+  const existing = openChats.find((row) => row.status !== 'closed') || openChats[0];
   const conversationId = existing?.id || `conv_${randomUUID()}`;
   const unreadCount = existing ? Number(existing.unread_count || 0) + 1 : 1;
   if (existing) {
@@ -827,9 +843,14 @@ export const sendMessage = async ({ account, visitId, conversationId, text, send
   const vehicle = await vehicleById(conversation.vehicleId);
   const body = cleanText(text, 500);
   if (!body) return { error: 'invalid_input' };
-  const asOwner = senderRole === 'owner';
+  const asOwner = senderRole === 'owner' || owns(account, vehicle);
   if (asOwner && !owns(account, vehicle)) return { error: 'forbidden' };
-  if (!asOwner && conversation.reporterSessionId !== visitId) return { error: 'forbidden' };
+  if (!asOwner) {
+    const reported = visitId
+      ? must(await supabase().from('reports').select('id').eq('vehicle_id', conversation.vehicleId).eq('reporter_session_id', visitId).limit(1)) || []
+      : [];
+    if (conversation.reporterSessionId !== visitId && !reported.length) return { error: 'forbidden' };
+  }
   const now = new Date();
   const stamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   must(await supabase().from('messages').insert({

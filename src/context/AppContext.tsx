@@ -148,6 +148,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Navigation
   const [currentView, setViewState] = useState<AppView>(() => readSavedView(null));
   const pendingView = useRef(localStorage.getItem(VIEW_KEY));
+  const booted = useRef(false);
   const viewRef = useRef<AppView>(currentView);
   viewRef.current = currentView;
   const [language, setLanguageState] = useState<Language>(() => {
@@ -395,11 +396,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const pending = pendingView.current;
     pendingView.current = null;
     setViewState((view) => {
-      const signingIn = view === 'login' || view === 'register';
-      if (!signingIn && data.user?.role === 'admin' && pending && isAppView(pending) && isAdminView(pending)) return pending;
-      if (!data.user && (isOwnerView(view) || isAdminView(view))) {
-        return 'landing';
+      const role = data.user?.role;
+      const publicViews: AppView[] = ['landing', 'how-it-works', 'features', 'pricing', 'contact'];
+      const scanning = window.location.hash.includes('scan=') || window.location.search.includes('scan=');
+      if (!booted.current) {
+        booted.current = true;
+        const openedBefore = sessionStorage.getItem('carsila_session_open') === '1';
+        sessionStorage.setItem('carsila_session_open', '1');
+        if (scanning || view === 'qr-scan-flow' || view === 'qr-report-form' || view === 'qr-submitted') return view;
+        if (window.location.hash.replace(/^#/, '') === 'admin' && role !== 'admin') {
+          return view === 'register' ? 'register' : 'login';
+        }
+        if (role === 'owner' || role === 'admin') {
+          const home = role === 'admin' ? 'admin-overview' : 'dashboard';
+          const ownPage = role === 'admin' ? isAdminView(view) : isOwnerView(view);
+          if (!openedBefore) return home;
+          if (ownPage) return view;
+          if (sessionStorage.getItem('carsila_chose_public') === '1' && publicViews.includes(view)) return view;
+          if (!ownPage && pending && isAppView(pending) && (role === 'admin' ? isAdminView(pending) : isOwnerView(pending))) return pending;
+          return home;
+        }
       }
+      if (!data.user && (isOwnerView(view) || isAdminView(view))) return 'landing';
       return view;
     });
   };
@@ -480,6 +498,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setCurrentView = (view: AppView) => {
     const role = currentUser?.role;
+    const publicViews: AppView[] = ['landing', 'how-it-works', 'features', 'pricing', 'contact'];
+    if ((role === 'owner' || role === 'admin') && publicViews.includes(view)) {
+      sessionStorage.setItem('carsila_chose_public', '1');
+    }
+    if (isOwnerView(view) || isAdminView(view)) sessionStorage.removeItem('carsila_chose_public');
     if (view === 'login' || view === 'register') {
       pendingView.current = null;
       if (window.location.hash.replace(/^#/, '') === 'admin') {

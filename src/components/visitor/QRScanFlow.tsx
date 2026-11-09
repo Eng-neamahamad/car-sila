@@ -5,7 +5,7 @@ import { TranslateControl } from '../common/TranslatedText';
 import { EmergencyCall } from '../call/EmergencyCall';
 import { ReturnCountdown } from '../common/QuickReturn';
 import { compressPhoto } from '../../lib/photo';
-import { ChatPhoto } from '../common/ChatPhoto';
+import { ChatPhoto, readChatPhoto } from '../common/ChatPhoto';
 import { ReportCategory, VehicleStatus } from '../../types';
 import {
   Car,
@@ -535,26 +535,29 @@ export const QRScanFlow: React.FC = () => {
             <div className="rounded-3xl border border-white/10 bg-[#101626] p-4">
               <p className="mb-3 text-xs font-bold text-slate-400">{t('visitorChatHint')}</p>
               <div className="mb-3 max-h-48 space-y-2 overflow-y-auto">
-                {(conversation?.messages || []).map((message) => (
+                {(conversation?.messages || []).map((message) => {
+                  const shown = readChatPhoto(message.text, message.photoReportId);
+                  return (
                   <div
                     key={message.id}
                     className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${
                       message.senderRole === 'reporter'
-                        ? 'bg-[#38BDF8]/15 text-[#38BDF8]'
-                        : 'bg-white/10 text-white'
+                        ? 'ms-auto bg-[#38BDF8]/15 text-[#38BDF8]'
+                        : 'me-auto bg-white/10 text-white'
                     }`}
                   >
-                    {message.text && (
+                    {shown.text && (
                       <TranslateControl
-                        text={message.text}
+                        text={shown.text}
                         language={language}
                         alignEnd={message.senderRole !== 'reporter'}
                         className=""
                       />
                     )}
-                    <ChatPhoto reportId={message.photoReportId} />
+                    <ChatPhoto reportId={shown.reportId} />
                   </div>
-                ))}
+                  );
+                })}
                 <div ref={chatEndRef} />
               </div>
               <form

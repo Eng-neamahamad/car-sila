@@ -1,4 +1,6 @@
 import React from 'react';
+import { api } from '../../data/api';
+import type { CallView } from '../call/peer';
 import { useApp } from '../../context/AppContext';
 import {
   Bell,
@@ -40,8 +42,36 @@ export const NotificationsView: React.FC = () => {
     }
   };
 
+  const showCall = (call: CallView) => {
+    window.dispatchEvent(new CustomEvent('carsila-show-call', { detail: call }));
+  };
+
+  const when = (iso: string, fallback: string) => {
+    const then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return fallback;
+    const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+    if (mins < 1) return language === 'ar' ? 'الآن' : 'Just now';
+    if (mins < 60) return language === 'ar' ? `قبل ${mins} دقيقة` : `${mins} min ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return language === 'ar' ? `قبل ${hours} ساعة` : `${hours} h ago`;
+    return new Date(iso).toLocaleDateString(language === 'ar' ? 'ar' : 'en');
+  };
+
   const handleClickNotif = (notif: any) => {
     markNotificationAsRead(notif.id);
+    if (notif.type === 'voice_call') {
+      const missed: CallView = { id: notif.callId || 'ended', status: 'ended', plate: '', car: '', createdAt: notif.createdAt || '' };
+      const openLive = async () => {
+        if (notif.callId) {
+          const data = await api<{ call: CallView }>(`/api/calls/live?id=${encodeURIComponent(notif.callId)}`);
+          if (data.call.status === 'ringing' || data.call.status === 'active') return data.call;
+        }
+        const data = await api<{ calls: CallView[] }>('/api/calls/incoming');
+        return data.calls[0] || null;
+      };
+      void openLive().then((call) => showCall(call || missed)).catch(() => showCall(missed));
+      return;
+    }
     if (notif.reportId) {
       setSelectedReportId(notif.reportId);
       setCurrentView('reports');
@@ -108,10 +138,10 @@ export const NotificationsView: React.FC = () => {
                       )}
                     </div>
                     <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                      {notif.message}
+                      {String(notif.message || '').replace(/\s*\[\[call:[A-Za-z0-9_-]+\]\]\s*/g, ' ').trim()}
                     </p>
                     <span className="text-[11px] text-slate-400 font-medium mt-1 block">
-                      {notif.timeAgo}
+                      {when(notif.createdAt, notif.timeAgo)}
                     </span>
                   </div>
                 </div>

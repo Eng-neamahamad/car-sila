@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../data/api';
 
+export const readChatPhoto = (text: string, photoReportId?: string) => {
+  const match = text.match(/\[\[photo:([A-Za-z0-9_-]+)\]\]/);
+  return {
+    text: text.replace(/\s*\[\[photo:[A-Za-z0-9_-]+\]\]\s*/g, ' ').replace(/\s+/g, ' ').trim(),
+    reportId: photoReportId || match?.[1] || ''
+  };
+};
+
 export const ChatPhoto: React.FC<{ reportId?: string }> = ({ reportId }) => {
   const [src, setSrc] = useState('');
 

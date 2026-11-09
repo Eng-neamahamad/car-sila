@@ -7,7 +7,7 @@ import ws from 'ws';
 import { sendPush } from './push.js';
 
 const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'safety.json');
-const RING_MS = 90 * 1000;
+const RING_MS = 3 * 60 * 1000;
 const LIVE_MS = 20 * 60 * 1000;
 
 const load = () => {
@@ -242,7 +242,7 @@ const notifyCall = async (call) => {
     report_id: null,
     type: 'voice_call',
     title: 'اتصال صوتي طارئ',
-    message: `شخص بجانب السيارة ${call.plate} يطلب التحدث معك. لن يظهر رقم هاتف أي طرف.`,
+    message: `شخص بجانب السيارة ${call.plate} يطلب التحدث معك. لن يظهر رقم هاتف أي طرف.\n[[call:${call.id}]]`,
     time_ago: 'Just now',
     created_at: call.createdAt,
     is_read: false,

@@ -142,6 +142,7 @@ export interface AppNotification {
   userId: string;
   vehicleId?: string;
   reportId?: string;
+  callId?: string;
   type: 'new_report' | 'lights_warning' | 'report_resolved' | 'qr_scanned' | 'chat_message' | 'voice_call' | 'system';
   title: string;
   message: string;

@@ -12,6 +12,7 @@ export const IncomingCall: React.FC = () => {
   const [muted, setMuted] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [note, setNote] = useState('');
+  const [notice, setNotice] = useState('');
   const peerRef = useRef<AudioPeer | null>(null);
   const seenRef = useRef(new Set<string>());
   const activeId = useRef('');
@@ -29,23 +30,59 @@ export const IncomingCall: React.FC = () => {
       try {
         const data = await api<{ calls: CallView[] }>('/api/calls/incoming');
         const next = data.calls.find((item) => !dismissed.current.has(item.id)) || null;
-        if (!stopped) setCall(next);
+        if (!stopped) {
+          setCall(next);
+          if (next) setNotice('');
+        }
       } catch {
         if (!stopped && phaseRef.current === 'incoming') setCall(null);
       }
     };
     void load();
     const timer = window.setInterval(() => void load(), 2000);
-    const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'carsila-open') void load();
+    const openSaved = async (id: string) => {
+      try {
+        const data = await api<{ call: CallView }>(`/api/calls/live?id=${encodeURIComponent(id)}`);
+        window.dispatchEvent(new CustomEvent('carsila-show-call', { detail: data.call }));
+      } catch {
+        window.dispatchEvent(new CustomEvent('carsila-show-call', { detail: { id, status: 'ended', plate: '', car: '', createdAt: '' } }));
+      }
     };
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'carsila-open') return;
+      try {
+        const id = new URL(event.data.url || '/', window.location.origin).searchParams.get('call');
+        if (id) void openSaved(id);
+      } catch {
+        void load();
+      }
+    };
+    const onShow = (event: Event) => {
+      const next = (event as CustomEvent<CallView>).detail;
+      if (!next) return;
+      if (next.status === 'ringing' || (next.status === 'active' && phaseRef.current === 'live')) {
+        dismissed.current.delete(next.id);
+        setNotice('');
+        setCall(next);
+        if (next.status === 'ringing' && phaseRef.current !== 'live') setPhase('incoming');
+        return;
+      }
+      setCall(null);
+      setNotice(ar
+        ? 'هالمكالمة خلصت، لهيك ما في زر رد. خلي الشخص الثاني يضغط اتصال مرة ثانية، وبتطلع شاشة فيها زر رد.'
+        : 'This call already ended, so there is no answer button. Ask them to call again and the answer screen will appear.');
+    };
+    window.addEventListener('carsila-show-call', onShow);
     navigator.serviceWorker?.addEventListener('message', onMessage);
+    const initial = new URLSearchParams(window.location.search).get('call');
+    if (initial) void openSaved(initial);
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      window.removeEventListener('carsila-show-call', onShow);
       navigator.serviceWorker?.removeEventListener('message', onMessage);
     };
-  }, [currentUser?.role]);
+  }, [ar, currentUser?.role]);
 
   useEffect(() => {
     if (!call?.id || phase !== 'incoming') return;
@@ -89,7 +126,29 @@ export const IncomingCall: React.FC = () => {
     peerRef.current?.stop();
   }, []);
 
-  if (!call || currentUser?.role !== 'owner') return null;
+  if (currentUser?.role !== 'owner') return null;
+
+  if (!call) {
+    if (!notice) return null;
+    return (
+      <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/70 p-4 sm:items-center">
+        <div className="w-full max-w-md rounded-3xl border border-rose-400/40 bg-[#1a0c12] p-5 shadow-2xl">
+          <p className="text-xs font-bold uppercase tracking-wider text-rose-200">
+            {ar ? 'اتصال صوتي طارئ' : 'Emergency voice call'}
+          </p>
+          <h2 className="mt-2 text-lg font-black text-white">{ar ? 'المكالمة انتهت' : 'The call ended'}</h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-200">{notice}</p>
+          <button
+            type="button"
+            onClick={() => setNotice('')}
+            className="mt-5 w-full rounded-2xl bg-cyan-500 py-3 text-sm font-black text-[#041018] cursor-pointer"
+          >
+            {ar ? 'تمام' : 'OK'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const stopPeer = () => {
     peerRef.current?.stop();

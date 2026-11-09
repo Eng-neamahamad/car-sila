@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TranslateControl } from '../common/TranslatedText';
-import { ChatPhoto } from '../common/ChatPhoto';
+import { ChatPhoto, readChatPhoto } from '../common/ChatPhoto';
 import { Conversation } from '../../types';
 import {
   MessageSquare,
@@ -17,6 +17,7 @@ const latestAt = (conversation: Conversation) =>
 export const MessagesView: React.FC = () => {
   const {
     conversations,
+    vehicles,
     activeConversationId,
     setActiveConversationId,
     sendMessage,
@@ -62,16 +63,18 @@ export const MessagesView: React.FC = () => {
     setMobileList(false);
   };
 
+  const ownsPlate = (plate: string) => vehicles.some((item) => item.plateNumber === plate);
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !selected) return;
-    sendMessage(selected.id, inputText, selected.side === 'reporter' ? 'reporter' : 'owner');
+    sendMessage(selected.id, inputText, ownsPlate(selected.vehiclePlate) ? 'owner' : 'reporter');
     setInputText('');
   };
 
   const handleQuickReply = (text: string) => {
     if (!selected) return;
-    sendMessage(selected.id, text, selected.side === 'reporter' ? 'reporter' : 'owner');
+    sendMessage(selected.id, text, ownsPlate(selected.vehiclePlate) ? 'owner' : 'reporter');
   };
 
   if (!sorted.length) {
@@ -120,7 +123,7 @@ export const MessagesView: React.FC = () => {
                       <span className="shrink-0 text-[10px] text-slate-400">{item.lastMessageTime}</span>
                     </div>
                     <p className="truncate text-[11px] text-slate-400">{item.vehicleName}</p>
-                    <p className="mt-1 truncate text-xs text-slate-300">{item.lastMessage}</p>
+                    <p className="mt-1 truncate text-xs text-slate-300">{readChatPhoto(item.lastMessage).text}</p>
                   </div>
                   {item.unreadCount > 0 && (
                     <span className="mt-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
@@ -154,9 +157,9 @@ export const MessagesView: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <h3 className="truncate text-sm font-extrabold text-white">
-                    {selected.side === 'reporter'
-                      ? (language === 'ar' ? 'صاحب السيارة' : 'Vehicle owner')
-                      : t('anonymousReporter')}
+                    {ownsPlate(selected.vehiclePlate)
+                      ? t('anonymousReporter')
+                      : (language === 'ar' ? 'صاحب السيارة' : 'Vehicle owner')}
                   </h3>
                   <span className="flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
@@ -183,9 +186,14 @@ export const MessagesView: React.FC = () => {
             </div>
 
             {selected.messages.map((msg) => {
-              const mine = selected.side === 'reporter'
-                ? msg.senderRole === 'reporter'
-                : msg.senderRole === 'owner';
+              const viewerOwns = ownsPlate(selected.vehiclePlate);
+              const mine = viewerOwns ? msg.senderRole === 'owner' : msg.senderRole === 'reporter';
+              const shown = readChatPhoto(msg.text, msg.photoReportId);
+              const who = mine
+                ? (language === 'ar' ? 'أنت' : 'You')
+                : viewerOwns
+                  ? (language === 'ar' ? 'المرسل' : 'Reporter')
+                  : (language === 'ar' ? 'صاحب السيارة' : 'Owner');
               return (
                 <div
                   key={msg.id}
@@ -196,15 +204,16 @@ export const MessagesView: React.FC = () => {
                       ? 'rounded-br-none bg-cyan-500 text-white'
                       : 'rounded-bl-none border border-cyan-500/20 bg-[#0a2430] text-white'
                   }`}>
-                    {msg.text && (
+                    <p className={`mb-1 text-[10px] font-bold ${mine ? 'text-white/80' : 'text-cyan-300'}`}>{who}</p>
+                    {shown.text && (
                       <TranslateControl
-                        text={msg.text}
+                        text={shown.text}
                         language={language}
                         alignEnd={mine}
                         className=""
                       />
                     )}
-                    <ChatPhoto reportId={msg.photoReportId} />
+                    <ChatPhoto reportId={shown.reportId} />
                   </div>
                   <div className="mt-1 flex items-center gap-1 px-1">
                     <span className="text-[10px] font-medium text-slate-400">
