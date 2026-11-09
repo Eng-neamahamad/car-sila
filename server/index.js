@@ -29,6 +29,7 @@ import {
   ownerIncoming,
   publicVehicle,
   recordFailedLogin,
+  recordVisitDay,
   regenerateToken,
   registerAccount,
   reportPhotoFor,
@@ -94,7 +95,8 @@ app.use(cors({
   origin(origin, callback) {
     callback(null, originAllowed(origin));
   },
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'X-Car-Sila-Visit']
 }));
 app.use(express.json({ limit: '800kb' }));
 app.use(cookieParser());
@@ -170,7 +172,15 @@ const authLimiter = rateLimit({
 });
 
 const currentAccount = (req) => accountForSession(req.cookies.carsila_sid);
-const currentVisit = (req) => req.cookies.carsila_visit || '';
+const currentVisit = (req) => {
+  const cookie = String(req.cookies.carsila_visit || '').trim();
+  const header = String(req.headers['x-car-sila-visit'] || '').trim();
+  return cookie || header;
+};
+
+const rememberVisit = (res, visitId) => {
+  res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
+};
 
 const sendWorkspace = async (res, account, visitId) => {
   res.json(await workspaceFor(account, visitId));
@@ -197,9 +207,15 @@ const fail = (res, error) => {
 
 app.get('/api/bootstrap', async (req, res) => {
   try {
-    const visitId = await ensureVisit(currentVisit(req));
-    res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
-    await sendWorkspace(res, await currentAccount(req), visitId);
+    const account = await currentAccount(req);
+    let visitId = currentVisit(req);
+    if (account?.role !== 'admin') {
+      visitId = await ensureVisit(visitId);
+      await recordVisitDay(visitId);
+      rememberVisit(res, visitId);
+    }
+    const workspace = await workspaceFor(account, visitId);
+    res.json({ ...workspace, visitId: visitId || undefined });
   } catch (error) {
     fail(res, error);
   }
@@ -295,11 +311,11 @@ app.get('/api/public/vehicle', async (req, res) => {
 
 app.post('/api/public/reports', reportLimiter, async (req, res) => {
   try {
+    const account = await currentAccount(req);
     const visitId = await ensureVisit(currentVisit(req));
-    if (visitId !== currentVisit(req)) {
-      res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
-    }
-    const result = await submitReport(visitId, req.body || {}, await currentAccount(req));
+    rememberVisit(res, visitId);
+    if (account?.role !== 'admin') await recordVisitDay(visitId);
+    const result = await submitReport(visitId, req.body || {}, account);
     if (result.error) return res.status(result.error === 'not_found' ? 404 : 400).json({ error: result.error });
     res.status(201).json({ conversation: result.conversation });
   } catch (error) {
@@ -308,10 +324,10 @@ app.post('/api/public/reports', reportLimiter, async (req, res) => {
 });
 
 const openVisit = async (req, res) => {
+  const account = await currentAccount(req);
   const visitId = await ensureVisit(currentVisit(req));
-  if (visitId !== currentVisit(req)) {
-    res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
-  }
+  rememberVisit(res, visitId);
+  if (account?.role !== 'admin') await recordVisitDay(visitId);
   return visitId;
 };
 

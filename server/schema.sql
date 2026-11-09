@@ -107,6 +107,13 @@ create table if not exists visits (
   created_at timestamptz
 );
 
+create table if not exists visit_days (
+  visit_id text not null references visits(id) on delete cascade,
+  day date not null,
+  primary key (visit_id, day)
+);
+grant select, insert, update, delete on visit_days to service_role;
+
 create index if not exists vehicles_owner_idx on vehicles(owner_id);
 create index if not exists vehicles_plate_idx on vehicles(plate_number);
 create unique index if not exists vehicles_plate_compact_idx
@@ -118,6 +125,7 @@ create index if not exists messages_conversation_idx on messages(conversation_id
 create index if not exists notifications_user_idx on notifications(user_id);
 create index if not exists activities_vehicle_idx on activities(vehicle_id);
 create index if not exists sessions_user_idx on sessions(user_id);
+create index if not exists visit_days_day_idx on visit_days(day);
 
 alter table vehicles add column if not exists return_at timestamptz;
 
@@ -166,6 +174,7 @@ alter table notifications enable row level security;
 alter table activities enable row level security;
 alter table sessions enable row level security;
 alter table visits enable row level security;
+alter table visit_days enable row level security;
 alter table calls enable row level security;
 alter table report_photos enable row level security;
 alter table push_subscriptions enable row level security;

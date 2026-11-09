@@ -620,12 +620,22 @@ export const accountForSession = async (id) => {
 
 export const VISIT_MS = 365 * 24 * 60 * 60 * 1000;
 
+const visitIdOk = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
+
+const todayStamp = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+};
+
 export const ensureVisit = async (id) => {
-  if (id) {
-    const existing = must(await supabase().from('visits').select('id, expires_at').eq('id', id).maybeSingle());
+  const wanted = visitIdOk(id) ? id : '';
+  if (wanted) {
+    const existing = must(await supabase().from('visits').select('id, expires_at').eq('id', wanted).maybeSingle());
     if (existing && Number(existing.expires_at) > Date.now()) return existing.id;
   }
-  const created = randomUUID();
+  const created = wanted || randomUUID();
   const expiresAt = Date.now() + VISIT_MS;
   const inserted = await supabase().from('visits').insert({
     id: created,
@@ -634,40 +644,64 @@ export const ensureVisit = async (id) => {
   });
   if (inserted.error && /created_at/i.test(inserted.error.message || '')) {
     must(await supabase().from('visits').insert({ id: created, expires_at: expiresAt }));
+  } else if (inserted.error && inserted.error.code === '23505') {
+    return created;
   } else if (inserted.error) {
     throw inserted.error;
   }
   return created;
 };
 
-const visitStarted = (row) => {
-  if (row.created_at) {
-    const time = new Date(row.created_at).getTime();
-    if (!Number.isNaN(time)) return time;
-  }
-  const expires = Number(row.expires_at);
-  if (!Number.isFinite(expires)) return 0;
-  return expires > Date.now() + 24 * 60 * 60 * 1000 ? expires - VISIT_MS : expires;
-};
+const VISIT_DAY_RE = /^vd_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(\d{4}-\d{2}-\d{2})$/i;
 
-export const visitorSummary = async () => {
-  const withCreated = await supabase().from('visits').select('created_at, expires_at');
-  const rows = withCreated.error && /created_at/i.test(withCreated.error.message || '')
-    ? must(await supabase().from('visits').select('expires_at'))
-    : must(withCreated);
+const visitDayRowId = (id, day) => `vd_${id}_${day}`;
+
+const summarizeVisitDays = (rows) => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - 6);
-  const weekStart = start.getTime();
-  const points = [0, 0, 0, 0, 0, 0, 0];
-  let week = 0;
+  const weekStartDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+  const weekIds = new Set();
+  const allIds = new Set();
+  const daily = Array.from({ length: 7 }, () => new Set());
   rows.forEach((row) => {
-    const time = visitStarted(row);
-    if (time >= weekStart) week += 1;
-    const index = Math.floor((time - weekStart) / 86400000);
-    if (index >= 0 && index < 7) points[index] += 1;
+    const day = String(row.day || '').slice(0, 10);
+    if (!day || !row.visit_id) return;
+    allIds.add(row.visit_id);
+    if (day >= weekStartDay) weekIds.add(row.visit_id);
+    const parts = day.split('-').map(Number);
+    const when = new Date(parts[0], parts[1] - 1, parts[2]);
+    const index = Math.round((when.getTime() - start.getTime()) / 86400000);
+    if (index >= 0 && index < 7) daily[index].add(row.visit_id);
   });
-  return { total: rows.length, week, points };
+  return {
+    total: allIds.size,
+    week: weekIds.size,
+    points: daily.map((set) => set.size)
+  };
+};
+
+export const recordVisitDay = async (id) => {
+  if (!visitIdOk(id)) return;
+  const day = todayStamp();
+  const row = { id: visitDayRowId(id, day), expires_at: Date.now() + VISIT_MS, created_at: new Date().toISOString() };
+  const inserted = await supabase().from('visits').insert(row);
+  if (inserted.error && /created_at/i.test(inserted.error.message || '')) {
+    const retry = await supabase().from('visits').insert({ id: row.id, expires_at: row.expires_at });
+    if (retry.error && retry.error.code !== '23505') throw retry.error;
+    return;
+  }
+  if (inserted.error && inserted.error.code !== '23505') throw inserted.error;
+};
+
+export const visitorSummary = async () => {
+  const empty = { total: 0, week: 0, points: [0, 0, 0, 0, 0, 0, 0] };
+  const marked = await supabase().from('visits').select('id').like('id', 'vd_%').limit(20000);
+  if (marked.error) return empty;
+  return summarizeVisitDays((marked.data || []).flatMap((row) => {
+    const match = String(row.id || '').match(VISIT_DAY_RE);
+    return match ? [{ visit_id: match[1], day: match[2] }] : [];
+  }));
 };
 
 const owns = (account, vehicle) =>

@@ -19,6 +19,26 @@ export type Workspace = {
   users: User[];
   mailReady?: boolean;
   visitors?: { total: number; week: number; points: number[] };
+  visitId?: string;
+};
+
+const VISIT_KEY = 'carsila_visit';
+
+const readVisitId = () => {
+  try {
+    return localStorage.getItem(VISIT_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+export const rememberVisitId = (id?: string) => {
+  if (!id) return;
+  try {
+    localStorage.setItem(VISIT_KEY, id);
+  } catch {
+    // Private browsing can block localStorage.
+  }
 };
 
 export type PublicVehicle = {
@@ -50,16 +70,23 @@ export const toVisitorVehicle = (vehicle: PublicVehicle): Vehicle => ({
 });
 
 export async function api<T>(path: string, body?: unknown): Promise<T> {
+  const visitId = readVisitId();
+  const headers: Record<string, string> = {};
+  if (visitId) headers['X-Car-Sila-Visit'] = visitId;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(path, {
     method: body === undefined ? 'GET' : 'POST',
     credentials: 'include',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const code = typeof data.error === 'string' ? data.error : 'request_failed';
     throw new ApiError(code);
+  }
+  if (data && typeof data === 'object' && typeof (data as Workspace).visitId === 'string') {
+    rememberVisitId((data as Workspace).visitId);
   }
   return data as T;
 }

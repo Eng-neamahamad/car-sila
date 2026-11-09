@@ -393,6 +393,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVisitors(data.user?.role === 'admin' && data.visitors
       ? data.visitors
       : { total: 0, week: 0, points: [0, 0, 0, 0, 0, 0, 0] });
+    if (data.visitId) {
+      try {
+        localStorage.setItem('carsila_visit', data.visitId);
+      } catch {
+        // Private browsing can block localStorage.
+      }
+    }
     const pending = pendingView.current;
     pendingView.current = null;
     setViewState((view) => {
