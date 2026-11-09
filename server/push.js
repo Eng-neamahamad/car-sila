@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 const require = createRequire(import.meta.url);
 let webpush;
@@ -22,7 +23,10 @@ const supabase = () => {
     const url = setting('SUPABASE_URL');
     const key = setting('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !key) throw new Error('Supabase is not configured');
-    client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    client = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: ws }
+    });
   }
   return client;
 };
@@ -116,20 +120,21 @@ const forget = async (endpoint) => {
   if (removed.error && !missing(removed.error)) console.error(removed.error);
 };
 
-export const sendCallAlert = async (userId, { title, body }) => {
-  if (!ready()) return;
+export const sendPush = async (userId, { title, body, url = '/', tag }) => {
+  if (!ready() || !userId) return;
   const subscriptions = await subscriptionsFor(userId);
   const payload = JSON.stringify({
     title,
     body,
-    url: '/'
+    url,
+    tag: tag || `note-${Date.now()}`
   });
   await Promise.all(subscriptions.map(async (item) => {
     try {
       await pushLibrary().sendNotification({
         endpoint: item.endpoint,
         keys: { p256dh: item.p256dh, auth: item.auth }
-      }, payload, { TTL: 90, urgency: 'high' });
+      }, payload, { TTL: 60 * 60, urgency: 'high' });
     } catch (error) {
       if (error?.statusCode === 404 || error?.statusCode === 410) await forget(item.endpoint);
       else console.error(error);

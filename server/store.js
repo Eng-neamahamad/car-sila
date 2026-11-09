@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { sendReportEmail } from './mail.js';
+import { sendPush } from './push.js';
 import { cachedReturn, incomingCalls, ownerSignal, readPhoto, savePhoto, saveReturn, startCall, visitorCall, visitorHangup, visitorIce, ownerCall } from './safety.js';
 import { unpackText } from './translate.js';
 
@@ -660,6 +661,12 @@ export const submitReport = async (visitId, input, account) => {
     is_read: false,
     severity: category === 'blocking' ? 'urgent' : 'warning'
   }));
+  await sendPush(vehicle.ownerId, {
+    title: `بلاغ عن ${vehicle.plateNumber}`,
+    body: notice.slice(0, 140),
+    url: '/',
+    tag: `report-${reportId}`
+  }).catch((error) => console.error(error));
   await insertActivity({
     id: `act_${randomUUID()}`,
     vehicleId: vehicle.id,
@@ -776,6 +783,12 @@ export const sendMessage = async ({ account, visitId, conversationId, text, send
       is_read: false,
       severity: 'info'
     }));
+    await sendPush(vehicle.ownerId, {
+      title: `رسالة عن ${vehicle.plateNumber}`,
+      body: body.slice(0, 140),
+      url: '/',
+      tag: `chat-${conversationId}`
+    }).catch((error) => console.error(error));
   }
   return { ok: true };
 };

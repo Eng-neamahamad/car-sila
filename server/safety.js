@@ -3,7 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
-import { sendCallAlert } from './push.js';
+import ws from 'ws';
+import { sendPush } from './push.js';
 
 const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'safety.json');
 const RING_MS = 90 * 1000;
@@ -35,7 +36,10 @@ const supabase = () => {
     const url = setting('SUPABASE_URL');
     const key = setting('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !key) throw new Error('Supabase is not configured');
-    client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    client = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: ws }
+    });
   }
   return client;
 };
@@ -244,9 +248,11 @@ const notifyCall = async (call) => {
     severity: 'urgent'
   });
   if (note.error) console.error(note.error);
-  await sendCallAlert(call.ownerId, {
-    title: 'اتصال صوتي طارئ',
-    body: `${call.car} • ${call.plate}. شخص بجانب السيارة يطلب التحدث معك.`
+  await sendPush(call.ownerId, {
+    title: 'اتصال صوتي',
+    body: `${call.car} • ${call.plate}. شخص يطلب التحدث معك.`,
+    url: `/?call=${encodeURIComponent(call.id)}`,
+    tag: `call-${call.id}`
   }).catch((error) => console.error(error));
 };
 

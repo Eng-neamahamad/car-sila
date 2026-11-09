@@ -21,17 +21,27 @@ export const phoneAlertReady = async () => {
   return subscription ? 'granted' : 'default';
 };
 
-export const enablePhoneAlert = async () => {
-  if (phoneAlertState() === 'unsupported') return 'unsupported';
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return permission;
+const subscribePhone = async () => {
   const registration = await navigator.serviceWorker.register('/sw.js');
   const ready = await navigator.serviceWorker.ready;
   const { key } = await api<{ key: string }>('/api/push/key');
-  const subscription = await ready.pushManager.subscribe({
+  const existing = await ready.pushManager.getSubscription();
+  const subscription = existing || await ready.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: keyBytes(key)
   });
   await api('/api/push/subscribe', subscription.toJSON());
-  return registration ? 'granted' : 'granted';
+  return registration ? 'granted' as const : 'granted' as const;
+};
+
+export const enablePhoneAlert = async () => {
+  if (phoneAlertState() === 'unsupported') return 'unsupported';
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return permission;
+  return subscribePhone();
+};
+
+export const ensurePhoneAlert = async () => {
+  if (phoneAlertState() !== 'granted') return phoneAlertState();
+  return subscribePhone();
 };

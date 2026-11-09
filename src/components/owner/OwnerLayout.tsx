@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
@@ -20,6 +20,7 @@ import {
 import { AppView } from '../../types';
 import logo from '../../assets/logo.png';
 import { PhoneAlertButton } from './PhoneAlertButton';
+import { ensurePhoneAlert } from '../../lib/phoneAlert';
 
 interface OwnerLayoutProps {
   children: React.ReactNode;
@@ -45,6 +46,11 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
   } = useApp();
 
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.role !== 'owner' || currentUser.status !== 'active') return;
+    void ensurePhoneAlert().catch(() => undefined);
+  }, [currentUser?.id, currentUser?.role, currentUser?.status]);
   const unreadNotifsCount = notifications ? notifications.filter((n) => !n.isRead).length : 0;
   const unreadMessages = conversations ? conversations.reduce((sum, item) => sum + (item.unreadCount || 0), 0) : 0;
   const newReportsCount = reports ? reports.filter((r) => r.status === 'new').length : 0;

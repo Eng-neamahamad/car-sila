@@ -24,7 +24,7 @@ export const IncomingCall: React.FC = () => {
     if (currentUser?.role !== 'owner') return;
     let stopped = false;
     const load = async () => {
-      if (document.hidden || activeId.current || phaseRef.current !== 'incoming') return;
+      if (activeId.current || phaseRef.current !== 'incoming') return;
       try {
         const data = await api<{ calls: CallView[] }>('/api/calls/incoming');
         const next = data.calls.find((item) => !dismissed.current.has(item.id)) || null;
@@ -35,9 +35,14 @@ export const IncomingCall: React.FC = () => {
     };
     void load();
     const timer = window.setInterval(() => void load(), 2000);
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'carsila-open') void load();
+    };
+    navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      navigator.serviceWorker?.removeEventListener('message', onMessage);
     };
   }, [currentUser?.role]);
 
