@@ -47,8 +47,8 @@ export const SosAlarm: React.FC = () => {
         about_5: 'حوالي 5 كم',
         about_10: 'حوالي 10 كم',
         within_15: 'ضمن 15 كم',
-        open: 'فتح النداء',
-        stop: 'إيقاف المنبه'
+        open: 'أساعد',
+        stop: 'ما بدي أساعد'
       }
     : {
         title: 'Urgent help call',
@@ -60,8 +60,8 @@ export const SosAlarm: React.FC = () => {
         about_5: 'About 5 km',
         about_10: 'About 10 km',
         within_15: 'Within 15 km',
-        open: 'Open call',
-        stop: 'Stop alarm'
+        open: 'I can help',
+        stop: 'Not this time'
       };
 
   const stopSound = () => {
@@ -178,7 +178,14 @@ export const SosAlarm: React.FC = () => {
           <button
             type="button"
             onClick={() => {
+              const id = call.id;
               dismiss();
+              void fetch('/api/sos/accept', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+              }).catch(() => undefined);
               setCurrentView('sos');
             }}
             className="flex-1 rounded-2xl bg-rose-500 py-3 text-sm font-black text-white hover:bg-rose-400"

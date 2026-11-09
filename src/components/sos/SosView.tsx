@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { BatteryCharging, LifeBuoy, MapPin, Wind } from 'lucide-react';
+import { BatteryCharging, LifeBuoy, Wind } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { saveLocationChoice } from '../../lib/locationChoice';
 
 type SosKind = 'battery' | 'air' | 'tow';
 
@@ -54,7 +55,7 @@ export const SosView: React.FC = () => {
   const text: Record<string, string> = arabic
     ? {
         title: 'طلب مساعدة',
-        intro: 'إذا تعطلت البطارية أو فرغ الإطار أو احتجت سحباً، أرسل نداءً للسائقين القريبين. المكان يظهر تقريبياً، ومن غير اسم أو هاتف.',
+        intro: 'إذا السيارة تعطلت أو صارت بحالة تحتاج مساعدة، أرسل نداءً. موقعك ما بيظهر لأي شخص، وما بيظهر مين قريب منك. اللي فعّل موقعه وبيكون قريب بيوصل له إشعار ويقرر يساعد أو لا.',
         caution: 'هذه المساعدة بين السائقين. في حالة الخطر على الحياة اتصل بالدفاع المدني أو الإسعاف.',
         ready: 'أنا جاهز أساعد',
         readyOn: 'وضع المساعدة شغّال',
@@ -71,7 +72,7 @@ export const SosView: React.FC = () => {
         accept: 'أقبل المساعدة',
         reply: 'اكتب رسالة',
         post: 'إرسال',
-        map: 'الموقع التقريبي',
+        map: '',
         open: 'بانتظار مساعد',
         helping: 'تم القبول',
         location: 'اسمح بالموقع من المتصفح حتى نحدد المسافة التقريبية.',
@@ -85,7 +86,7 @@ export const SosView: React.FC = () => {
       }
     : {
         title: 'Roadside help',
-        intro: 'If the battery dies, a tire is flat, or you need a tow, send a call to nearby drivers. The place stays approximate, with no name or phone number.',
+        intro: 'If the car breaks down or needs help, send a call. Your location stays hidden, and nobody is shown who is nearby. A driver who enabled location and is close gets a notice and chooses whether to help.',
         caution: 'This is help between drivers. If someone is in danger, contact emergency services.',
         ready: 'I can help nearby',
         readyOn: 'Help mode is on',
@@ -173,7 +174,8 @@ export const SosView: React.FC = () => {
 
   const toggleReady = async () => {
     if (data.ready) {
-      await post('/api/sos/help', { active: false });
+      const closed = await post('/api/sos/help', { active: false });
+      if (closed) saveLocationChoice('no');
       return;
     }
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -181,7 +183,8 @@ export const SosView: React.FC = () => {
     }
     try {
       const where = await locate();
-      await post('/api/sos/help', { active: true, ...where });
+      const saved = await post('/api/sos/help', { active: true, ...where });
+      if (saved) saveLocationChoice('yes');
     } catch {
       setError(text.location);
     }
@@ -223,12 +226,6 @@ export const SosView: React.FC = () => {
         {actions}
       </div>
       {item.note && <p className="mt-3 text-sm text-slate-200">{item.note}</p>}
-      {item.mapUrl && (
-        <a href={item.mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-cyan-300">
-          <MapPin className="h-3.5 w-3.5" />
-          {text.map}
-        </a>
-      )}
       {item.messages.length > 0 && (
         <ul className="mt-3 space-y-2">
           {item.messages.map((message) => (

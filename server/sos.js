@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
+import { sendPush } from './push.js';
 
 const KINDS = new Set(['battery', 'air', 'tow']);
 const RADIUS_KM = 15;
@@ -104,14 +105,33 @@ const present = async (row, account, helper) => {
     kind: row.kind,
     note: row.note || '',
     status: row.status,
-    range: km == null ? '' : rangeFor(km),
+    range: mine || km == null ? '' : rangeFor(km),
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     mine,
     helping,
     messages,
-    mapUrl: visible ? `https://maps.google.com/?q=${row.lat},${row.lng}` : ''
+    mapUrl: ''
   };
+};
+
+const notifyNearby = (row) => {
+  void (async () => {
+    const helpers = await db().from('sos_helpers').select('user_id,lat,lng,active,updated_at').eq('active', true);
+    if (helpers.error || !helpers.data) return;
+    const now = Date.now();
+    await Promise.all(helpers.data.map(async (helper) => {
+      if (!helper.active || helper.user_id === row.requester_id || helper.lat == null || helper.lng == null) return;
+      if (now - new Date(helper.updated_at).getTime() > HELP_MS) return;
+      if (distanceKm(helper.lat, helper.lng, row.lat, row.lng) > RADIUS_KM) return;
+      await sendPush(helper.user_id, {
+        title: 'طلب مساعدة قريب',
+        body: 'في سيارة قريبة تحتاج مساعدة. بدك تساعد؟',
+        url: '/',
+        tag: `sos-${row.id}`
+      }).catch(() => undefined);
+    }));
+  })().catch(() => undefined);
 };
 
 const activeAccount = (account) => {
@@ -191,8 +211,9 @@ export const sosCreate = async (account, input) => {
   if (existing.error) throw existing.error;
   if (existing.data) return { error: 'sos_open' };
   const now = new Date();
+  const id = `sos_${randomUUID()}`;
   const inserted = await db().from('sos_requests').insert({
-    id: `sos_${randomUUID()}`,
+    id,
     requester_id: account.id,
     kind,
     note,
@@ -205,6 +226,7 @@ export const sosCreate = async (account, input) => {
   });
   if (inserted.error && missingTable(inserted.error)) return { error: 'sos_unavailable' };
   if (inserted.error) throw inserted.error;
+  notifyNearby({ id, requester_id: account.id, lat: where.lat, lng: where.lng });
   return sosState(account);
 };
 

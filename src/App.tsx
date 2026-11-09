@@ -24,6 +24,7 @@ import { ActivityView } from './components/owner/ActivityView';
 import { SettingsView } from './components/owner/SettingsView';
 import { SosView } from './components/sos/SosView';
 import { SosAlarm } from './components/sos/SosAlarm';
+import { LocationConsent } from './components/sos/LocationConsent';
 
 // Admin Portal
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -246,6 +247,7 @@ const AppContent: React.FC = () => {
       <AddVehicleModal />
       <IncomingCall />
       <SosAlarm />
+      <LocationConsent />
       <FreeMonthNotice />
       <InstallBar />
 
