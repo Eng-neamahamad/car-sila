@@ -253,15 +253,17 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
               onClick={() => {
                 setActiveScanVehicle(null);
                 setCurrentView('qr-scan-flow');
+                setMenuOpen(false);
               }}
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
                 theme === 'dark'
                   ? 'border-slate-700 bg-slate-800 text-amber-400 hover:bg-slate-700'
                   : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
               }`}
+              aria-label={language === 'ar' ? 'مسح QR' : 'Scan QR'}
             >
               <span className="text-amber-500">🏁</span>
-              <span>{language === 'ar' ? 'مسح QR (زائر)' : 'Scan QR (Visitor)'}</span>
+              <span className="hidden sm:inline">{language === 'ar' ? 'مسح QR (زائر)' : 'Scan QR (Visitor)'}</span>
             </button>
           </div>
         </header>
@@ -272,6 +274,20 @@ export const OwnerLayout: React.FC<OwnerLayoutProps> = ({ children }) => {
           <nav className={`md:hidden border-b px-3 py-2 space-y-1 ${
             theme === 'dark' ? 'bg-[#061820] border-cyan-950' : 'bg-white border-slate-200'
           }`}>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveScanVehicle(null);
+                setCurrentView('qr-scan-flow');
+                setMenuOpen(false);
+              }}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold cursor-pointer ${
+                theme === 'dark' ? 'text-amber-300' : 'text-amber-700'
+              }`}
+            >
+              <span>🏁</span>
+              <span className="flex-1 text-start">{language === 'ar' ? 'مسح QR (زائر)' : 'Scan QR (Visitor)'}</span>
+            </button>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id || (item.id === 'my-vehicles' && currentView === 'vehicle-details');

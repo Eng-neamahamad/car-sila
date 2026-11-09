@@ -46,12 +46,12 @@ export const PhoneAlertButton: React.FC<{ compact?: boolean }> = ({ compact = fa
   }
 
   const note = state === 'unsupported'
-    ? (ar ? 'هذا المتصفح لا يدعم تنبيه الجوال.' : 'This browser cannot show phone alerts.')
+    ? (ar ? 'هذا المتصفح لا يدعم تنبيه الجوال. على آيفون افتح التطبيق من أيقونة الشاشة الرئيسية.' : 'This browser cannot show phone alerts. On iPhone, open the app from the Home Screen icon.')
     : state === 'denied'
     ? (ar ? 'التنبيه مرفوض من إعدادات المتصفح. اسمح بالإشعارات ثم أعد المحاولة.' : 'Notifications are blocked in the browser settings. Allow them and try again.')
     : (ar
-      ? 'فعّل الرنين مرة واحدة. بعدها الجوال يطلع التنبيه ويصدر صوتاً حتى وأنت خارج الموقع. على آيفون أضف الموقع إلى الشاشة الرئيسية.'
-      : 'Turn this on once. The phone then shows the alert and plays a sound even when the site is closed. On iPhone, add the site to the Home Screen.');
+      ? 'اضغط الزر مرة واحدة حتى يوصل الإشعار والجوال مقفّل.'
+      : 'Press once so alerts arrive while the phone app is closed.');
 
   return (
     <div className={compact ? 'flex flex-col gap-2 sm:flex-row sm:items-center' : 'space-y-3'}>
