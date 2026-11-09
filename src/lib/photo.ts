@@ -16,8 +16,13 @@ export const compressPhoto = (file: File) => new Promise<string>((resolve, rejec
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
     URL.revokeObjectURL(url);
     const encoded = (quality: number) => canvas.toDataURL('image/jpeg', quality);
-    const first = encoded(0.72);
-    resolve(first.length > 500000 ? encoded(0.5) : first);
+    let quality = 0.72;
+    let result = encoded(quality);
+    while (result.length > 480000 && quality > 0.35) {
+      quality -= 0.12;
+      result = encoded(quality);
+    }
+    resolve(result);
   };
   image.onerror = () => {
     URL.revokeObjectURL(url);

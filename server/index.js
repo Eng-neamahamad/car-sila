@@ -397,9 +397,7 @@ app.post('/api/calls/signal', async (req, res) => {
 
 app.get('/api/reports/photo', async (req, res) => {
   try {
-    const account = await requireAccount(req, res);
-    if (!account) return;
-    const result = await reportPhotoFor(account, req.query.id);
+    const result = await reportPhotoFor(await currentAccount(req), req.query.id, currentVisit(req));
     if (result.error) return res.status(result.error === 'not_found' ? 404 : 403).json({ error: result.error });
     res.json(result);
   } catch (error) {

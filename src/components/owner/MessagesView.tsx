@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TranslateControl } from '../common/TranslatedText';
+import { ChatPhoto } from '../common/ChatPhoto';
 import { Conversation } from '../../types';
 import {
   MessageSquare,
@@ -190,16 +191,21 @@ export const MessagesView: React.FC = () => {
                   key={msg.id}
                   className={`flex flex-col ${mine ? 'items-end' : 'items-start'} animate-fadeIn`}
                 >
-                  <TranslateControl
-                    text={msg.text}
-                    language={language}
-                    alignEnd={mine}
-                    className={`max-w-md rounded-2xl px-4 py-3 text-sm font-medium leading-relaxed shadow-sm ${
-                      mine
-                        ? 'rounded-br-none bg-cyan-500 text-white'
-                        : 'rounded-bl-none border border-cyan-500/20 bg-[#0a2430] text-white'
-                    }`}
-                  />
+                  <div className={`max-w-md rounded-2xl px-4 py-3 text-sm font-medium leading-relaxed shadow-sm ${
+                    mine
+                      ? 'rounded-br-none bg-cyan-500 text-white'
+                      : 'rounded-bl-none border border-cyan-500/20 bg-[#0a2430] text-white'
+                  }`}>
+                    {msg.text && (
+                      <TranslateControl
+                        text={msg.text}
+                        language={language}
+                        alignEnd={mine}
+                        className=""
+                      />
+                    )}
+                    <ChatPhoto reportId={msg.photoReportId} />
+                  </div>
                   <div className="mt-1 flex items-center gap-1 px-1">
                     <span className="text-[10px] font-medium text-slate-400">
                       {msg.timestamp}

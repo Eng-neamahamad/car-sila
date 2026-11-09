@@ -5,6 +5,7 @@ import { TranslateControl } from '../common/TranslatedText';
 import { EmergencyCall } from '../call/EmergencyCall';
 import { ReturnCountdown } from '../common/QuickReturn';
 import { compressPhoto } from '../../lib/photo';
+import { ChatPhoto } from '../common/ChatPhoto';
 import { ReportCategory, VehicleStatus } from '../../types';
 import {
   Car,
@@ -473,7 +474,6 @@ export const QRScanFlow: React.FC = () => {
               ref={photoInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -536,17 +536,24 @@ export const QRScanFlow: React.FC = () => {
               <p className="mb-3 text-xs font-bold text-slate-400">{t('visitorChatHint')}</p>
               <div className="mb-3 max-h-48 space-y-2 overflow-y-auto">
                 {(conversation?.messages || []).map((message) => (
-                  <TranslateControl
+                  <div
                     key={message.id}
-                    text={message.text}
-                    language={language}
-                    alignEnd={message.senderRole !== 'reporter'}
                     className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${
                       message.senderRole === 'reporter'
                         ? 'bg-[#38BDF8]/15 text-[#38BDF8]'
                         : 'bg-white/10 text-white'
                     }`}
-                  />
+                  >
+                    {message.text && (
+                      <TranslateControl
+                        text={message.text}
+                        language={language}
+                        alignEnd={message.senderRole !== 'reporter'}
+                        className=""
+                      />
+                    )}
+                    <ChatPhoto reportId={message.photoReportId} />
+                  </div>
                 ))}
                 <div ref={chatEndRef} />
               </div>

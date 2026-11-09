@@ -110,6 +110,7 @@ export interface ChatMessage {
   senderRole: 'owner' | 'reporter';
   senderName: string;
   text: string;
+  photoReportId?: string;
   translation?: string;
   sourceLang?: Language;
   targetLang?: Language;

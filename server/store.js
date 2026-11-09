@@ -125,14 +125,25 @@ const reportFrom = (row) => {
   timestamp: row.timestamp
 }; };
 
+const photoMarker = (text) => {
+  const value = String(text || '');
+  const match = value.match(/\n?\[\[photo:([A-Za-z0-9_-]+)\]\]\s*$/);
+  return {
+    text: match ? value.slice(0, match.index).trim() : value,
+    photoReportId: match?.[1] || ''
+  };
+};
+
 const messageFrom = (row) => {
   const body = unpackText(row.body);
+  const shown = photoMarker(body.text);
   return {
   id: row.id,
   conversationId: row.conversation_id,
   senderRole: row.sender_role,
   senderName: row.sender_name,
-  text: body.text,
+  text: shown.text,
+  photoReportId: shown.photoReportId || undefined,
   translation: body.translation || undefined,
   sourceLang: body.from || undefined,
   targetLang: body.to || undefined,
@@ -142,7 +153,7 @@ const messageFrom = (row) => {
 }; };
 
 const conversationFrom = (row, messages) => {
-  const last = unpackText(row.last_message);
+  const last = unpackText(photoMarker(row.last_message).text);
   return {
   id: row.id,
   reportId: row.report_id,
@@ -252,12 +263,13 @@ export const setVehicleReturn = async (account, id, minutes) => {
   return {};
 };
 
-export const reportPhotoFor = async (account, id) => {
-  if (!account) return { error: 'forbidden' };
-  const row = must(await supabase().from('reports').select('id,vehicle_id,created_at').eq('id', id).maybeSingle());
+export const reportPhotoFor = async (account, id, visitId = '') => {
+  const row = must(await supabase().from('reports').select('id,vehicle_id,reporter_session_id,created_at').eq('id', id).maybeSingle());
   if (!row) return { error: 'not_found' };
   const vehicle = await vehicleById(row.vehicle_id);
-  if (account.role !== 'admin' && vehicle?.ownerId !== account.id) return { error: 'forbidden' };
+  const owner = account && (account.role === 'admin' || vehicle?.ownerId === account.id);
+  const reporter = visitId && row.reporter_session_id === visitId;
+  if (!owner && !reporter) return { error: 'forbidden' };
   const saved = await readPhoto(id);
   if (!saved) return { error: 'not_found' };
   return { photo: saved.photo, capturedAt: saved.capturedAt || row.created_at };
@@ -311,6 +323,40 @@ const presentConversation = (conversation, audience, vehicle, ownerName) => ({
   }))
 });
 
+const unifyChats = async (rows) => {
+  const groups = new Map();
+  for (const row of rows || []) {
+    const key = `${row.vehicle_id}:${row.reporter_session_id}`;
+    const list = groups.get(key) || [];
+    list.push(row);
+    groups.set(key, list);
+  }
+  const remove = new Set();
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const ids = list.map((row) => row.id);
+    const messages = must(await supabase().from('messages').select('id,conversation_id,body,timestamp,created_at').in('conversation_id', ids).order('created_at', { ascending: true })) || [];
+    const newest = messages[messages.length - 1];
+    const keeper = list.find((row) => row.id === newest?.conversation_id) || list[0];
+    for (const extra of list) {
+      if (extra.id === keeper.id) continue;
+      must(await supabase().from('messages').update({ conversation_id: keeper.id }).eq('conversation_id', extra.id));
+      remove.add(extra.id);
+    }
+    const plain = photoMarker(String(newest?.body || keeper.last_message || '')).text;
+    must(await supabase().from('conversations').update({
+      last_message: plain || keeper.last_message,
+      last_message_time: newest?.timestamp || keeper.last_message_time,
+      status: 'open'
+    }).eq('id', keeper.id));
+    keeper.last_message = plain || keeper.last_message;
+    keeper.last_message_time = newest?.timestamp || keeper.last_message_time;
+    keeper.status = 'open';
+  }
+  if (remove.size) must(await supabase().from('conversations').delete().in('id', [...remove]));
+  return (rows || []).filter((row) => !remove.has(row.id));
+};
+
 const decorate = async (conversations, audience) => {
   const vehicleIds = [...new Set(conversations.map((item) => item.vehicleId))];
   const vehicleRows = vehicleIds.length
@@ -334,10 +380,37 @@ const countFor = async (ownerId) => {
   return result.count || 0;
 };
 
+let linkedPhotos = false;
+
+const linkReportPhotos = async () => {
+  if (linkedPhotos) return;
+  linkedPhotos = true;
+  const photos = await supabase().from('report_photos').select('report_id');
+  if (photos.error || !photos.data?.length) return;
+  for (const photo of photos.data) {
+    const marker = `[[photo:${photo.report_id}]]`;
+    const report = await supabase().from('reports').select('id,vehicle_id,reporter_session_id,created_at').eq('id', photo.report_id).maybeSingle();
+    if (report.error || !report.data) continue;
+    const chats = await supabase().from('conversations').select('id').eq('vehicle_id', report.data.vehicle_id).eq('reporter_session_id', report.data.reporter_session_id);
+    const ids = (chats.data || []).map((row) => row.id);
+    if (!ids.length) continue;
+    const messages = await supabase().from('messages').select('id,body,created_at').in('conversation_id', ids).eq('sender_role', 'reporter').order('created_at', { ascending: true });
+    const rows = messages.data || [];
+    if (rows.some((row) => String(row.body).includes(marker))) continue;
+    const reportTime = new Date(report.data.created_at).getTime();
+    const target = rows
+      .filter((row) => !String(row.body).includes('[[photo:'))
+      .sort((a, b) => Math.abs(new Date(a.created_at).getTime() - reportTime) - Math.abs(new Date(b.created_at).getTime() - reportTime))[0];
+    if (!target) continue;
+    await supabase().from('messages').update({ body: `${target.body}\n${marker}` }).eq('id', target.id);
+  }
+};
+
 export const workspaceFor = async (account, visitId) => {
+  await linkReportPhotos();
   if (!account) {
     const rows = visitId
-      ? must(await supabase().from('conversations').select('*').eq('reporter_session_id', visitId))
+      ? await unifyChats(must(await supabase().from('conversations').select('*').eq('reporter_session_id', visitId)))
       : [];
     return {
       user: null,
@@ -365,7 +438,7 @@ export const workspaceFor = async (account, visitId) => {
       user: publicUser(account, vehicleRows.filter((item) => item.ownerId === account.id).length),
       vehicles: vehicleRows,
       reports: must(reports).map(reportFrom),
-      conversations: await decorate(await withMessages(must(conversationRows)), 'owner'),
+      conversations: await decorate(await withMessages(await unifyChats(must(conversationRows))), 'owner'),
       notifications: must(notifications).map(notificationFrom),
       activities: must(activities).map(activityFrom),
       users: accountRows.map((row) => publicUser(
@@ -388,9 +461,9 @@ export const workspaceFor = async (account, visitId) => {
       ? supabase().from('conversations').select('*').eq('reporter_session_id', visitId)
       : Promise.resolve({ data: [] })
   ]);
-  const ownedRows = must(ownedConversationRows);
+  const ownedRows = await unifyChats(must(ownedConversationRows));
   const ownedIds = new Set(ownedRows.map((row) => row.id));
-  const reporterRows = must(visitConversationRows).filter((row) => !ownedIds.has(row.id));
+  const reporterRows = await unifyChats(must(visitConversationRows).filter((row) => !ownedIds.has(row.id)));
   const conversations = [
     ...(await decorate(await withMessages(ownedRows), 'owner')),
     ...(await decorate(await withMessages(reporterRows), 'visitor'))
@@ -626,7 +699,6 @@ export const submitReport = async (visitId, input, account) => {
   const notice = `${reporterLabel} أرسل بلاغاً عن السيارة ${carLabel}: ${title}`;
   const now = new Date();
   const reportId = `rep_${randomUUID()}`;
-  const conversationId = `conv_${randomUUID()}`;
   const stamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   must(await supabase().from('reports').insert({
     id: reportId,
@@ -680,7 +752,45 @@ export const submitReport = async (visitId, input, account) => {
     tagType: 'new',
     createdAt: now.toISOString()
   });
-  must(await supabase().from('conversations').insert({
+  const storedBody = photo ? `${description}\n[[photo:${reportId}]]` : description;
+  const openChats = await unifyChats(must(await supabase().from('conversations').select('*').eq('vehicle_id', vehicle.id).eq('reporter_session_id', visitId).eq('status', 'open')) || []);
+  const existing = openChats[0];
+  const conversationId = existing?.id || `conv_${randomUUID()}`;
+  const unreadCount = existing ? Number(existing.unread_count || 0) + 1 : 1;
+  if (existing) {
+    must(await supabase().from('conversations').update({
+      report_id: reportId,
+      last_message: description,
+      last_message_time: stamp,
+      unread_count: unreadCount,
+      status: 'open'
+    }).eq('id', conversationId));
+  } else {
+    must(await supabase().from('conversations').insert({
+      id: conversationId,
+      report_id: reportId,
+      vehicle_id: vehicle.id,
+      vehicle_name: `${vehicle.brand} ${vehicle.model}`,
+      vehicle_plate: vehicle.plateNumber,
+      last_message: description,
+      last_message_time: stamp,
+      unread_count: unreadCount,
+      reporter_session_id: visitId,
+      status: 'open'
+    }));
+  }
+  must(await supabase().from('messages').insert({
+    id: `msg_${randomUUID()}`,
+    conversation_id: conversationId,
+    sender_role: 'reporter',
+    sender_name: reporterName,
+    body: storedBody,
+    timestamp: stamp,
+    created_at: now.toISOString(),
+    is_read: false
+  }));
+  const messageRows = must(await supabase().from('messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true })) || [];
+  const conversation = conversationFrom({
     id: conversationId,
     report_id: reportId,
     vehicle_id: vehicle.id,
@@ -688,43 +798,10 @@ export const submitReport = async (visitId, input, account) => {
     vehicle_plate: vehicle.plateNumber,
     last_message: description,
     last_message_time: stamp,
-    unread_count: 1,
+    unread_count: unreadCount,
     reporter_session_id: visitId,
     status: 'open'
-  }));
-  const message = {
-    id: `msg_${randomUUID()}`,
-    conversationId,
-    senderRole: 'reporter',
-    senderName: reporterName,
-    text: description,
-    timestamp: stamp,
-    createdAt: now.toISOString(),
-    isRead: false
-  };
-  must(await supabase().from('messages').insert({
-    id: message.id,
-    conversation_id: conversationId,
-    sender_role: 'reporter',
-    sender_name: reporterName,
-    body: description,
-    timestamp: stamp,
-    created_at: now.toISOString(),
-    is_read: false
-  }));
-  const conversation = {
-    id: conversationId,
-    reportId,
-    vehicleId: vehicle.id,
-    vehicleName: `${vehicle.brand} ${vehicle.model}`,
-    vehiclePlate: vehicle.plateNumber,
-    lastMessage: description,
-    lastMessageTime: stamp,
-    unreadCount: 1,
-    reporterSessionId: visitId,
-    status: 'open',
-    messages: [message]
-  };
+  }, messageRows.map(messageFrom));
   try {
     const owner = must(await supabase().from('accounts').select('name,email').eq('id', vehicle.ownerId).maybeSingle());
     if (owner?.email) {

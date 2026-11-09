@@ -695,6 +695,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     description: string;
     hasLocation: boolean;
     locationName?: string;
+    photo?: string;
   }): Promise<Report> => {
     const token = activeScanVehicle?.qrToken;
     if (!token) {

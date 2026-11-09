@@ -25,7 +25,7 @@ const load = () => {
 
 let disk = load();
 let chain = Promise.resolve();
-let mode = 'unknown';
+const storeMode = { calls: 'unknown', photos: 'unknown', returns: 'unknown' };
 let client;
 let announced = false;
 
@@ -66,19 +66,20 @@ const future = (value) => {
   return Number.isFinite(time) && time > Date.now() ? new Date(time).toISOString() : '';
 };
 
-const detect = async () => {
-  if (mode !== 'unknown') return mode;
-  const [calls, photos, vehicles] = await Promise.all([
-    supabase().from('calls').select('id').limit(1),
-    supabase().from('report_photos').select('report_id').limit(1),
-    supabase().from('vehicles').select('return_at').limit(1)
-  ]);
-  mode = !calls.error && !photos.error && !vehicles.error ? 'db' : 'file';
-  if (mode === 'file' && !announced) {
+const detect = async (kind) => {
+  if (storeMode[kind] !== 'unknown') return storeMode[kind];
+  const probe = kind === 'calls'
+    ? supabase().from('calls').select('id').limit(1)
+    : kind === 'photos'
+    ? supabase().from('report_photos').select('report_id').limit(1)
+    : supabase().from('vehicles').select('return_at').limit(1);
+  const result = await probe;
+  storeMode[kind] = result.error ? 'file' : 'db';
+  if (kind === 'calls' && storeMode.calls === 'file' && !announced) {
     announced = true;
-    console.log('CAR-SILA safety features are stored locally until server/safety.sql is run in Supabase.');
+    console.log('CAR-SILA calls are stored locally until the calls table is available.');
   }
-  return mode;
+  return storeMode[kind];
 };
 
 const callFromRow = (row) => ({
@@ -126,7 +127,7 @@ const present = (call, side) => ({
 });
 
 const saveCall = async (call) => {
-  if (await detect() === 'db') {
+  if (await detect('calls') === 'db') {
     const row = {
       id: call.id,
       vehicle_id: call.vehicleId,
@@ -145,18 +146,18 @@ const saveCall = async (call) => {
     const saved = await supabase().from('calls').upsert(row);
     if (!saved.error) return;
     if (!missing(saved.error)) throw saved.error;
-    mode = 'file';
+    storeMode.calls = 'file';
   }
   disk.calls[call.id] = call;
   persist();
 };
 
 const readCall = async (id) => {
-  if (await detect() === 'db') {
+  if (await detect('calls') === 'db') {
     const row = await supabase().from('calls').select('*').eq('id', id).maybeSingle();
     if (row.error) {
       if (!missing(row.error)) throw row.error;
-      mode = 'file';
+      storeMode.calls = 'file';
     } else if (row.data) return expire(callFromRow(row.data));
   }
   const call = disk.calls[id];
@@ -188,7 +189,7 @@ export const cachedReturn = (id) => future(disk.returns[id]);
 
 export const saveReturn = (id, returnAt) => locked(async () => {
   const stamp = future(returnAt);
-  if (await detect() === 'db') {
+  if (await detect('returns') === 'db') {
     const updated = await supabase().from('vehicles').update({ return_at: stamp || null }).eq('id', id);
     if (!updated.error) {
       delete disk.returns[id];
@@ -196,7 +197,7 @@ export const saveReturn = (id, returnAt) => locked(async () => {
       return stamp;
     }
     if (!missing(updated.error)) throw updated.error;
-    mode = 'file';
+    storeMode.returns = 'file';
   }
   if (stamp) disk.returns[id] = stamp;
   else delete disk.returns[id];
@@ -205,7 +206,7 @@ export const saveReturn = (id, returnAt) => locked(async () => {
 });
 
 export const savePhoto = (id, photo, capturedAt) => locked(async () => {
-  if (await detect() === 'db') {
+  if (await detect('photos') === 'db') {
     const saved = await supabase().from('report_photos').upsert({
       report_id: id,
       photo,
@@ -213,18 +214,18 @@ export const savePhoto = (id, photo, capturedAt) => locked(async () => {
     });
     if (!saved.error) return;
     if (!missing(saved.error)) throw saved.error;
-    mode = 'file';
+    storeMode.photos = 'file';
   }
   disk.photos[id] = { photo, capturedAt };
   persist();
 });
 
 export const readPhoto = (id) => locked(async () => {
-  if (await detect() === 'db') {
+  if (await detect('photos') === 'db') {
     const row = await supabase().from('report_photos').select('photo,captured_at').eq('report_id', id).maybeSingle();
     if (row.error) {
       if (!missing(row.error)) throw row.error;
-      mode = 'file';
+      storeMode.photos = 'file';
     } else if (row.data?.photo) {
       return { photo: row.data.photo, capturedAt: row.data.captured_at };
     }
@@ -295,11 +296,11 @@ export const startCall = ({ vehicle, visitId, offer }) => locked(async () => {
 });
 
 const callsForVehicle = async (vehicleId) => {
-  if (await detect() === 'db') {
+  if (await detect('calls') === 'db') {
     const rows = await supabase().from('calls').select('*').eq('vehicle_id', vehicleId).in('status', ['ringing', 'active']);
     if (rows.error) {
       if (!missing(rows.error)) throw rows.error;
-      mode = 'file';
+      storeMode.calls = 'file';
     } else {
       return Object.fromEntries((rows.data || []).map((row) => {
         const call = callFromRow(row);
@@ -347,14 +348,14 @@ export const ownerCall = (id, ownerId) => locked(async () => {
 
 export const incomingCalls = (ownerId) => locked(async () => {
   let calls = [];
-  if (await detect() === 'db') {
+  if (await detect('calls') === 'db') {
     const rows = await supabase().from('calls').select('*').eq('owner_id', ownerId).in('status', ['ringing', 'active']).order('created_at', { ascending: false }).limit(5);
     if (rows.error) {
       if (!missing(rows.error)) throw rows.error;
-      mode = 'file';
+      storeMode.calls = 'file';
     } else calls = (rows.data || []).map(callFromRow);
   }
-  if (mode === 'file') calls = Object.values(disk.calls).filter((call) => call.ownerId === ownerId);
+  if (storeMode.calls === 'file') calls = Object.values(disk.calls).filter((call) => call.ownerId === ownerId);
   const live = [];
   for (const call of calls.map(expire)) {
     if (call.status === 'ringing' || call.status === 'active') live.push(call);
