@@ -130,14 +130,22 @@ export const sendPush = async (userId, { title, body, url = '/', tag }) => {
     tag: tag || `note-${Date.now()}`
   });
   await Promise.all(subscriptions.map(async (item) => {
+    let timer;
     try {
-      await pushLibrary().sendNotification({
-        endpoint: item.endpoint,
-        keys: { p256dh: item.p256dh, auth: item.auth }
-      }, payload, { TTL: 60 * 60, urgency: 'high' });
+      await Promise.race([
+        pushLibrary().sendNotification({
+          endpoint: item.endpoint,
+          keys: { p256dh: item.p256dh, auth: item.auth }
+        }, payload, { TTL: 60 * 60, urgency: 'high' }),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('push timeout')), 4000);
+        })
+      ]);
     } catch (error) {
       if (error?.statusCode === 404 || error?.statusCode === 410) await forget(item.endpoint);
-      else console.error(error);
+      else console.error(error?.message || error);
+    } finally {
+      clearTimeout(timer);
     }
   }));
 };

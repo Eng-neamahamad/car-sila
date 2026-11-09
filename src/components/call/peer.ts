@@ -42,26 +42,32 @@ export const unlockCallAudio = () => {
 const loadIceServers = async () => {
   try {
     const response = await fetch('/api/calls/ice-servers');
-    const data = await response.json() as { iceServers?: RTCIceServer[] };
-    if (Array.isArray(data.iceServers) && data.iceServers.length) return data.iceServers;
+    const data = await response.json() as { iceServers?: RTCIceServer[]; relay?: boolean };
+    if (Array.isArray(data.iceServers) && data.iceServers.length) {
+      return { iceServers: data.iceServers, relay: Boolean(data.relay) };
+    }
   } catch {
     // The call still tries a direct path when the relay list cannot be loaded.
   }
-  return fallbackIce;
+  return { iceServers: fallbackIce, relay: false };
 };
 
 export const startPeer = async (onIce: (candidate: string) => void): Promise<AudioPeer> => {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('mic_missing');
   const audio = unlockCallAudio();
-  const mic = navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
-  const servers = loadIceServers();
+  const mic = navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+  const servers = await loadIceServers();
   let stream: MediaStream;
   try {
     stream = await mic;
   } catch {
     throw new Error('mic_blocked');
   }
-  const pc = new RTCPeerConnection({ iceServers: await servers });
+  const pc = new RTCPeerConnection({
+    iceServers: servers.iceServers,
+    iceTransportPolicy: servers.relay ? 'relay' : 'all',
+    bundlePolicy: 'max-bundle'
+  });
   stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
   const pending: string[] = [];
   let ready = false;
@@ -76,7 +82,9 @@ export const startPeer = async (onIce: (candidate: string) => void): Promise<Aud
     else pending.push(raw);
   };
   pc.ontrack = (event) => {
-    audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+    const remote = event.streams[0] || new MediaStream([event.track]);
+    audio.srcObject = remote;
+    event.track.onunmute = () => hear();
     hear();
   };
   pc.onconnectionstatechange = () => {
@@ -103,21 +111,29 @@ export const startPeer = async (onIce: (candidate: string) => void): Promise<Aud
 };
 
 export const waitForIce = (pc: RTCPeerConnection) => new Promise<void>((resolve) => {
-  if (pc.iceGatheringState === 'complete') {
+  if (pc.iceGatheringState === 'complete' || pc.localDescription?.sdp?.includes('typ relay')) {
     resolve();
     return;
   }
-  const done = () => {
-    if (pc.iceGatheringState !== 'complete') return;
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
     window.clearTimeout(timer);
-    pc.removeEventListener('icegatheringstatechange', done);
+    pc.removeEventListener('icegatheringstatechange', onState);
+    pc.removeEventListener('icecandidate', onCandidate);
     resolve();
   };
-  const timer = window.setTimeout(() => {
-    pc.removeEventListener('icegatheringstatechange', done);
-    resolve();
-  }, 2500);
-  pc.addEventListener('icegatheringstatechange', done);
+  const onState = () => {
+    if (pc.iceGatheringState === 'complete') finish();
+  };
+  const onCandidate = (event: RTCPeerConnectionIceEvent) => {
+    const candidate = event.candidate;
+    if (candidate?.type === 'relay' || candidate?.candidate.includes('typ relay')) finish();
+  };
+  const timer = window.setTimeout(finish, 6000);
+  pc.addEventListener('icegatheringstatechange', onState);
+  pc.addEventListener('icecandidate', onCandidate);
 });
 
 export const addIce = async (pc: RTCPeerConnection, seen: Set<string>, list: string[] = []) => {

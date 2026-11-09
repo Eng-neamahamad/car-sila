@@ -736,9 +736,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         description: data.description,
         photo: data.photo
       });
-      const workspace = await api<Workspace>('/api/bootstrap');
-      applyWorkspace(workspace);
       setActiveConversationId(created.conversation.id);
+      void api<Workspace>('/api/bootstrap').then(applyWorkspace).catch(() => undefined);
       const report: Report = {
         ...emptyReport(data),
         id: created.conversation.reportId,

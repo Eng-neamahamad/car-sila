@@ -339,7 +339,7 @@ const presentConversation = (conversation, audience, vehicle, ownerName) => ({
 const unifyChats = async (rows) => {
   const groups = new Map();
   for (const row of rows || []) {
-    const key = String(row.vehicle_id || row.id);
+    const key = `${row.vehicle_id || ''}::${row.reporter_session_id || row.id}`;
     const list = groups.get(key) || [];
     list.push(row);
     groups.set(key, list);
@@ -396,6 +396,105 @@ const countFor = async (ownerId) => {
   return result.count || 0;
 };
 
+let splitPeopleDone = false;
+
+const splitPeople = async () => {
+  if (splitPeopleDone) return;
+  try {
+    const reports = await supabase().from('reports').select('id,vehicle_id,vehicle_name,vehicle_plate,reporter_session_id,description,title,created_at');
+    if (reports.error || !reports.data?.length) {
+      splitPeopleDone = true;
+      return;
+    }
+    const byVehicle = new Map();
+    for (const report of reports.data) {
+      const list = byVehicle.get(report.vehicle_id) || [];
+      list.push(report);
+      byVehicle.set(report.vehicle_id, list);
+    }
+    for (const [vehicleId, vehicleReports] of byVehicle) {
+      const sessions = [...new Set(vehicleReports.map((row) => row.reporter_session_id).filter(Boolean))];
+      if (sessions.length < 2) continue;
+      const chats = await supabase().from('conversations').select('*').eq('vehicle_id', vehicleId);
+      if (chats.error || !chats.data?.length) continue;
+      const messages = await supabase().from('messages').select('*').in('conversation_id', chats.data.map((row) => row.id)).order('created_at', { ascending: true });
+      if (messages.error) continue;
+      const sessionOf = (message) => {
+        const marker = photoMarker(String(message.body || '')).photoReportId;
+        const marked = marker && vehicleReports.find((row) => row.id === marker);
+        if (marked?.reporter_session_id) return marked.reporter_session_id;
+        const text = photoMarker(String(message.body || '')).text;
+        const time = new Date(message.created_at).getTime();
+        const matches = vehicleReports.filter((row) => {
+          const description = String(row.description || '').trim();
+          const title = String(row.title || '').trim();
+          return (description && (text === description || text.startsWith(description))) || (title && text === title);
+        });
+        matches.sort((a, b) => Math.abs(new Date(a.created_at).getTime() - time) - Math.abs(new Date(b.created_at).getTime() - time));
+        return matches[0]?.reporter_session_id || '';
+      };
+      const chatBySession = new Map(chats.data.map((row) => [row.reporter_session_id, row]));
+      let current = '';
+      const moves = [];
+      for (const message of messages.data || []) {
+        if (message.sender_role === 'reporter') {
+          const found = sessionOf(message);
+          if (found) current = found;
+        }
+        if (!current) continue;
+        const home = chats.data.find((row) => row.id === message.conversation_id);
+        if (home?.reporter_session_id === current) continue;
+        moves.push({ message, session: current });
+      }
+      if (!moves.length) continue;
+      for (const session of new Set(moves.map((item) => item.session))) {
+        if (chatBySession.has(session)) continue;
+        const report = vehicleReports.filter((row) => row.reporter_session_id === session).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        const id = `conv_${randomUUID()}`;
+        const created = await supabase().from('conversations').insert({
+          id,
+          report_id: report?.id || vehicleReports[0].id,
+          vehicle_id: vehicleId,
+          vehicle_name: report?.vehicle_name || chats.data[0].vehicle_name,
+          vehicle_plate: report?.vehicle_plate || chats.data[0].vehicle_plate,
+          last_message: photoMarker(String(report?.description || report?.title || '')).text,
+          last_message_time: '',
+          unread_count: 0,
+          reporter_session_id: session,
+          status: 'open'
+        });
+        if (created.error) continue;
+        chatBySession.set(session, { id, reporter_session_id: session });
+      }
+      for (const move of moves) {
+        const target = chatBySession.get(move.session);
+        if (!target || target.id === move.message.conversation_id) continue;
+        const moved = await supabase().from('messages').update({ conversation_id: target.id }).eq('id', move.message.id);
+        if (moved.error) throw moved.error;
+      }
+      const fresh = await supabase().from('conversations').select('id').eq('vehicle_id', vehicleId);
+      for (const chat of fresh.data || []) {
+        const chatMessages = await supabase().from('messages').select('body,timestamp,sender_role,is_read').eq('conversation_id', chat.id).order('created_at', { ascending: true });
+        const list = chatMessages.data || [];
+        if (!list.length) {
+          await supabase().from('conversations').delete().eq('id', chat.id);
+          continue;
+        }
+        const newest = list[list.length - 1];
+        await supabase().from('conversations').update({
+          last_message: photoMarker(String(newest.body || '')).text || String(newest.body || ''),
+          last_message_time: newest.timestamp,
+          unread_count: list.filter((row) => row.sender_role === 'reporter' && !row.is_read).length,
+          status: 'open'
+        }).eq('id', chat.id);
+      }
+    }
+    splitPeopleDone = true;
+  } catch (error) {
+    console.error('split chats failed', error?.message || error);
+  }
+};
+
 let linkedPhotos = false;
 
 const linkReportPhotos = async () => {
@@ -423,6 +522,7 @@ const linkReportPhotos = async () => {
 };
 
 export const workspaceFor = async (account, visitId) => {
+  await splitPeople();
   await linkReportPhotos();
   if (!account) {
     const rows = visitId
@@ -749,7 +849,7 @@ export const submitReport = async (visitId, input, account) => {
     is_read: false,
     severity: category === 'blocking' ? 'urgent' : 'warning'
   }));
-  await sendPush(vehicle.ownerId, {
+  void sendPush(vehicle.ownerId, {
     title: `بلاغ عن ${vehicle.plateNumber}`,
     body: notice.slice(0, 140),
     url: '/',
@@ -769,7 +869,7 @@ export const submitReport = async (visitId, input, account) => {
     createdAt: now.toISOString()
   });
   const storedBody = photo ? `${description}\n[[photo:${reportId}]]` : description;
-  const openChats = await unifyChats(must(await supabase().from('conversations').select('*').eq('vehicle_id', vehicle.id)) || []);
+  const openChats = await unifyChats(must(await supabase().from('conversations').select('*').eq('vehicle_id', vehicle.id).eq('reporter_session_id', visitId)) || []);
   const existing = openChats.find((row) => row.status !== 'closed') || openChats[0];
   const conversationId = existing?.id || `conv_${randomUUID()}`;
   const unreadCount = existing ? Number(existing.unread_count || 0) + 1 : 1;
@@ -818,21 +918,23 @@ export const submitReport = async (visitId, input, account) => {
     reporter_session_id: visitId,
     status: 'open'
   }, messageRows.map(messageFrom));
-  try {
-    const owner = must(await supabase().from('accounts').select('name,email').eq('id', vehicle.ownerId).maybeSingle());
-    if (owner?.email) {
-      await sendReportEmail({
-        to: owner.email,
-        ownerName: owner.name,
-        reporterLabel: reporterName,
-        vehicle,
-        title,
-        description
-      });
+  void (async () => {
+    try {
+      const owner = must(await supabase().from('accounts').select('name,email').eq('id', vehicle.ownerId).maybeSingle());
+      if (owner?.email) {
+        await sendReportEmail({
+          to: owner.email,
+          ownerName: owner.name,
+          reporterLabel: reporterName,
+          vehicle,
+          title,
+          description
+        });
+      }
+    } catch (error) {
+      console.error('report email failed', error?.message || error);
     }
-  } catch (error) {
-    console.error('report email failed', error?.message || error);
-  }
+  })();
   return { conversation: presentConversation(conversation, 'visitor', vehicle, '') };
 };
 
@@ -845,12 +947,7 @@ export const sendMessage = async ({ account, visitId, conversationId, text, send
   if (!body) return { error: 'invalid_input' };
   const asOwner = senderRole === 'owner' || owns(account, vehicle);
   if (asOwner && !owns(account, vehicle)) return { error: 'forbidden' };
-  if (!asOwner) {
-    const reported = visitId
-      ? must(await supabase().from('reports').select('id').eq('vehicle_id', conversation.vehicleId).eq('reporter_session_id', visitId).limit(1)) || []
-      : [];
-    if (conversation.reporterSessionId !== visitId && !reported.length) return { error: 'forbidden' };
-  }
+  if (!asOwner && conversation.reporterSessionId !== visitId) return { error: 'forbidden' };
   const now = new Date();
   const stamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   must(await supabase().from('messages').insert({

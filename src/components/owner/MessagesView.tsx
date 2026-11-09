@@ -39,7 +39,27 @@ export const MessagesView: React.FC = () => {
     return () => media.removeEventListener('change', apply);
   }, []);
 
+  const ownsPlate = (plate: string) => vehicles.some((item) => item.plateNumber === plate);
   const sorted = [...conversations].sort((a, b) => latestAt(b).localeCompare(latestAt(a)));
+  const personNo = new Map<string, number>();
+  const byPlate = new Map<string, Conversation[]>();
+  for (const item of conversations) {
+    if (!ownsPlate(item.vehiclePlate)) continue;
+    const list = byPlate.get(item.vehiclePlate) || [];
+    list.push(item);
+    byPlate.set(item.vehiclePlate, list);
+  }
+  for (const list of byPlate.values()) {
+    if (list.length < 2) continue;
+    [...list]
+      .sort((a, b) => (a.messages[0]?.createdAt || '').localeCompare(b.messages[0]?.createdAt || ''))
+      .forEach((item, index) => personNo.set(item.id, index + 1));
+  }
+  const personTitle = (item: Conversation) => {
+    const number = personNo.get(item.id);
+    if (number) return language === 'ar' ? `المرسل ${number}` : `Person ${number}`;
+    return ownsPlate(item.vehiclePlate) ? '' : (language === 'ar' ? 'صاحب السيارة' : 'Vehicle owner');
+  };
   const picked = sorted.find((item) => item.id === activeConversationId) || null;
   const selected = picked || (narrow ? null : sorted[0] || null);
   const showList = !narrow || mobileList || !picked;
@@ -62,8 +82,6 @@ export const MessagesView: React.FC = () => {
     setActiveConversationId(id);
     setMobileList(false);
   };
-
-  const ownsPlate = (plate: string) => vehicles.some((item) => item.plateNumber === plate);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,10 +137,10 @@ export const MessagesView: React.FC = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-extrabold text-white">{item.vehiclePlate}</p>
+                      <p className="truncate text-sm font-extrabold text-white">{personTitle(item) || item.vehiclePlate}</p>
                       <span className="shrink-0 text-[10px] text-slate-400">{item.lastMessageTime}</span>
                     </div>
-                    <p className="truncate text-[11px] text-slate-400">{item.vehicleName}</p>
+                    <p className="truncate text-[11px] text-slate-400">{personTitle(item) ? `${item.vehiclePlate} • ${item.vehicleName}` : item.vehicleName}</p>
                     <p className="mt-1 truncate text-xs text-slate-300">{readChatPhoto(item.lastMessage).text}</p>
                   </div>
                   {item.unreadCount > 0 && (
@@ -157,9 +175,7 @@ export const MessagesView: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <h3 className="truncate text-sm font-extrabold text-white">
-                    {ownsPlate(selected.vehiclePlate)
-                      ? t('anonymousReporter')
-                      : (language === 'ar' ? 'صاحب السيارة' : 'Vehicle owner')}
+                    {personTitle(selected) || t('anonymousReporter')}
                   </h3>
                   <span className="flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
