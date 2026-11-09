@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { api, ApiError } from '../../data/api';
-import { addIce, AudioPeer, CallView, startPeer, waitForIce } from './peer';
+import { addIce, AudioPeer, CallView, startPeer, unlockCallAudio, waitForIce } from './peer';
+import { startPhoneRing } from '../../lib/phoneRing';
 
 const text = (language: 'ar' | 'en', ar: string, en: string) => (language === 'ar' ? ar : en);
 
@@ -41,6 +42,11 @@ export const EmergencyCall: React.FC<{
   }, []);
 
   useEffect(() => {
+    if (phase !== 'ringing') return;
+    return startPhoneRing('outgoing');
+  }, [phase]);
+
+  useEffect(() => {
     if (phase !== 'live') return;
     const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
@@ -70,6 +76,7 @@ export const EmergencyCall: React.FC<{
   };
 
   const begin = async () => {
+    unlockCallAudio();
     setNote('');
     setMuted(false);
     answerRef.current = false;
@@ -99,6 +106,11 @@ export const EmergencyCall: React.FC<{
       }, 1000);
       peer.pc.onconnectionstatechange = () => {
         if (peer.pc.connectionState === 'failed') finish('ended');
+      };
+      peer.pc.oniceconnectionstatechange = () => {
+        if (peer.pc.iceConnectionState === 'failed') {
+          setNote(text(language, 'الاتصال فتح بس الصوت ما وصل للطرف الثاني. الجهازين على نت مختلف.', 'The call opened, but the voice did not reach the other phone. The two devices are on different networks.'));
+        }
       };
     } catch (error) {
       stop();

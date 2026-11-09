@@ -359,6 +359,21 @@ app.post('/api/public/calls/end', async (req, res) => {
   }
 });
 
+app.get('/api/calls/ice-servers', async (_req, res) => {
+  const fallback = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+  const key = String(process.env.TURN_API_KEY || '').trim();
+  const appName = String(process.env.TURN_APP || '').trim().replace(/^https?:\/\//, '').replace(/\.metered\.live.*$/, '');
+  if (!key || !appName) return res.json({ iceServers: fallback, relay: false });
+  try {
+    const response = await fetch(`https://${appName}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(key)}`);
+    const iceServers = await response.json();
+    if (!response.ok || !Array.isArray(iceServers) || !iceServers.length) return res.json({ iceServers: fallback, relay: false });
+    res.json({ iceServers, relay: true });
+  } catch {
+    res.json({ iceServers: fallback, relay: false });
+  }
+});
+
 app.get('/api/calls/incoming', async (req, res) => {
   try {
     const account = await requireAccount(req, res);

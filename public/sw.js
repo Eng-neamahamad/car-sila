@@ -15,7 +15,7 @@ self.addEventListener('push', (event) => {
     renotify: true,
     requireInteraction: true,
     silent: false,
-    vibrate: [400, 200, 400, 200, 400, 200, 800],
+    vibrate: [1000, 400, 1000, 400, 1000, 400, 1000],
     data: { url: data.url || '/' }
   }));
 });

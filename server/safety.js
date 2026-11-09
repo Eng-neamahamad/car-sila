@@ -181,7 +181,7 @@ const candidateOk = (value) => {
 };
 
 const pushIce = (list, candidate) => {
-  if (!candidateOk(candidate) || list.includes(candidate) || list.length >= 40) return list;
+  if (!candidateOk(candidate) || list.includes(candidate) || list.length >= 80) return list;
   return [...list, candidate];
 };
 

@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 import { api } from '../../data/api';
 import { useApp } from '../../context/AppContext';
-import { addIce, AudioPeer, CallView, startPeer, waitForIce } from './peer';
+import { addIce, AudioPeer, CallView, startPeer, unlockCallAudio, waitForIce } from './peer';
 import { showPhoneNotice } from '../../lib/phoneAlert';
+import { startPhoneRing } from '../../lib/phoneRing';
 
 export const IncomingCall: React.FC = () => {
   const { currentUser, language } = useApp();
@@ -94,26 +95,7 @@ export const IncomingCall: React.FC = () => {
       `/?call=${encodeURIComponent(id)}`,
       `call-${id}`
     );
-    const context = new AudioContext();
-    let stopped = false;
-    const beep = () => {
-      if (stopped || context.state === 'closed') return;
-      const tone = context.createOscillator();
-      const gain = context.createGain();
-      tone.frequency.value = 880;
-      gain.gain.setValueAtTime(0.05, context.currentTime);
-      tone.connect(gain);
-      gain.connect(context.destination);
-      tone.start();
-      tone.stop(context.currentTime + 0.35);
-    };
-    void context.resume().then(beep).catch(() => undefined);
-    const timer = window.setInterval(() => void context.resume().then(beep).catch(() => undefined), 1400);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-      void context.close().catch(() => undefined);
-    };
+    return startPhoneRing('incoming');
   }, [ar, call?.id, call?.car, phase]);
 
   useEffect(() => {
@@ -174,6 +156,7 @@ export const IncomingCall: React.FC = () => {
   };
 
   const accept = async () => {
+    unlockCallAudio();
     setNote('');
     seenRef.current = new Set();
     try {
@@ -189,6 +172,13 @@ export const IncomingCall: React.FC = () => {
       const data = await api<{ call: CallView }>('/api/calls/signal', { id: call.id, action: 'accept', answer: peer.pc.localDescription?.sdp || answer.sdp || '' });
       peer.flush();
       await addIce(peer.pc, seenRef.current, data.call.ice);
+      peer.pc.oniceconnectionstatechange = () => {
+        if (peer.pc.iceConnectionState === 'failed') {
+          setNote(ar
+            ? 'الشاشة فتحت بس صوت الطرف الثاني ما وصل. الجهازين على نت مختلف، والصوت محتاج خادم تحويل.'
+            : 'The screen opened, but the other voice did not arrive. The two phones are on different networks and the voice needs a relay.');
+        }
+      };
       setPhase('live');
       setSeconds(0);
       const timer = window.setInterval(() => {
