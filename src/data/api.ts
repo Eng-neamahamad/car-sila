@@ -23,18 +23,24 @@ export type Workspace = {
 };
 
 const VISIT_KEY = 'carsila_visit';
+const VISIT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const readVisitId = () => {
   try {
-    return localStorage.getItem(VISIT_KEY) || '';
+    const existing = localStorage.getItem(VISIT_KEY) || '';
+    if (VISIT_ID_RE.test(existing)) return existing;
+    const created = crypto.randomUUID();
+    localStorage.setItem(VISIT_KEY, created);
+    return created;
   } catch {
     return '';
   }
 };
 
 export const rememberVisitId = (id?: string) => {
-  if (!id) return;
+  if (!id || !VISIT_ID_RE.test(id)) return;
   try {
+    if (VISIT_ID_RE.test(localStorage.getItem(VISIT_KEY) || '')) return;
     localStorage.setItem(VISIT_KEY, id);
   } catch {
     // Private browsing can block localStorage.

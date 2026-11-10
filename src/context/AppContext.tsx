@@ -12,7 +12,7 @@ import {
   Conversation,
   ReportStatus
 } from '../types';
-import { api, ApiError, toVisitorVehicle, Workspace } from '../data/api';
+import { api, ApiError, rememberVisitId, toVisitorVehicle, Workspace } from '../data/api';
 import { showPhoneNotice } from '../lib/phoneAlert';
 import { translations } from '../data/translations';
 import {
@@ -393,13 +393,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVisitors(data.user?.role === 'admin' && data.visitors
       ? data.visitors
       : { total: 0, week: 0, points: [0, 0, 0, 0, 0, 0, 0] });
-    if (data.visitId) {
-      try {
-        localStorage.setItem('carsila_visit', data.visitId);
-      } catch {
-        // Private browsing can block localStorage.
-      }
-    }
+    rememberVisitId(data.visitId);
     const pending = pendingView.current;
     pendingView.current = null;
     setViewState((view) => {

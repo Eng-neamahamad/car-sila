@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -652,9 +652,20 @@ export const ensureVisit = async (id) => {
   return created;
 };
 
-const VISIT_DAY_RE = /^vd_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(\d{4}-\d{2}-\d{2})$/i;
+const VISIT_DAY_RE = /^vd_([0-9a-f]{32})_(\d{4}-\d{2}-\d{2})$/i;
 
 const visitDayRowId = (id, day) => `vd_${id}_${day}`;
+
+export const visitorDeviceKey = (ip, userAgent, visitId) => {
+  const visit = String(visitId || '').toLowerCase();
+  if (visitIdOk(visit)) {
+    return createHash('sha256').update(`visit:${visit}`).digest('hex').slice(0, 32);
+  }
+  const addr = String(ip || '').split(',')[0].trim();
+  const ua = String(userAgent || '').slice(0, 180);
+  if (!addr && !ua) return '';
+  return createHash('sha256').update(`net:${addr}|${ua}`).digest('hex').slice(0, 32);
+};
 
 const summarizeVisitDays = (rows) => {
   const start = new Date();
@@ -681,8 +692,9 @@ const summarizeVisitDays = (rows) => {
   };
 };
 
-export const recordVisitDay = async (id) => {
-  if (!visitIdOk(id)) return;
+export const recordVisitDay = async (key) => {
+  const id = String(key || '').toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(id)) return;
   const day = todayStamp();
   const row = { id: visitDayRowId(id, day), expires_at: Date.now() + VISIT_MS, created_at: new Date().toISOString() };
   const inserted = await supabase().from('visits').insert(row);

@@ -45,6 +45,7 @@ import {
   updateProfile,
   updateReportStatus,
   updateVehicleStatus,
+  visitorDeviceKey,
   VISIT_MS,
   workspaceFor
 } from './store.js';
@@ -175,11 +176,17 @@ const currentAccount = (req) => accountForSession(req.cookies.carsila_sid);
 const currentVisit = (req) => {
   const cookie = String(req.cookies.carsila_visit || '').trim();
   const header = String(req.headers['x-car-sila-visit'] || '').trim();
-  return cookie || header;
+  return header || cookie;
 };
 
 const rememberVisit = (res, visitId) => {
-  res.cookie('carsila_visit', visitId, { ...cookieOptions, maxAge: VISIT_MS });
+  res.cookie('carsila_visit', visitId, { ...cookieOptions, httpOnly: false, maxAge: VISIT_MS });
+};
+
+const countVisitor = async (req, account) => {
+  if (account?.role === 'admin') return;
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+  await recordVisitDay(visitorDeviceKey(ip, req.headers['user-agent'], currentVisit(req)));
 };
 
 const sendWorkspace = async (res, account, visitId) => {
@@ -210,8 +217,8 @@ app.get('/api/bootstrap', async (req, res) => {
     const account = await currentAccount(req);
     let visitId = currentVisit(req);
     if (account?.role !== 'admin') {
+      await countVisitor(req, account);
       visitId = await ensureVisit(visitId);
-      await recordVisitDay(visitId);
       rememberVisit(res, visitId);
     }
     const workspace = await workspaceFor(account, visitId);
@@ -314,7 +321,7 @@ app.post('/api/public/reports', reportLimiter, async (req, res) => {
     const account = await currentAccount(req);
     const visitId = await ensureVisit(currentVisit(req));
     rememberVisit(res, visitId);
-    if (account?.role !== 'admin') await recordVisitDay(visitId);
+    await countVisitor(req, account);
     const result = await submitReport(visitId, req.body || {}, account);
     if (result.error) return res.status(result.error === 'not_found' ? 404 : 400).json({ error: result.error });
     res.status(201).json({ conversation: result.conversation });
@@ -327,7 +334,7 @@ const openVisit = async (req, res) => {
   const account = await currentAccount(req);
   const visitId = await ensureVisit(currentVisit(req));
   rememberVisit(res, visitId);
-  if (account?.role !== 'admin') await recordVisitDay(visitId);
+  await countVisitor(req, account);
   return visitId;
 };
 
