@@ -66,6 +66,9 @@ const ALL_VIEWS: AppView[] = [
 export const isOwnerView = (view: AppView) => OWNER_VIEWS.includes(view);
 export const isAdminView = (view: AppView) => ADMIN_VIEWS.includes(view);
 
+export const needsLiveBootstrap = (view: AppView) =>
+  view === 'qr-scan-flow' || ((isOwnerView(view) || isAdminView(view)) && view !== 'settings');
+
 export const isAppView = (value: string | null): value is AppView =>
   !!value && ALL_VIEWS.includes(value as AppView);
 

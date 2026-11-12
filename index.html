@@ -16,37 +16,83 @@
     <meta name="apple-mobile-web-app-title" content="CAR-SILA" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CAR-SILA — التواصل الذكي للسيارات</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              brand: {
-                50: '#ecfdf5',
-                500: '#10b981',
-                600: '#059669',
-              },
-              space: '#0A0E1A',
-              neon: '#38BDF8',
-              secure: '#10B981',
-              alert: '#EF4444',
-              warn: '#F97316'
-            }
-          }
+    <meta name="description" content="تواصل ذكي وفوري بين السائقين وأصحاب السيارات بدون أرقام هواتف وبدون أجهزة تتبع. امسح رمز QR وأرسل بلاغاً بخصوصية تامة. Smart vehicle communication without sharing phone numbers." />
+    <meta name="keywords" content="CAR-SILA, QR, سيارة, بلاغ, خصوصية, vehicle QR, anonymous car alerts" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CAR-SILA" />
+    <meta property="og:title" content="CAR-SILA — التواصل الذكي للسيارات" />
+    <meta property="og:description" content="تواصل بين السائقين وأصحاب السيارات بدون كشف رقم الهاتف. امسح الـ QR وأرسل بلاغاً فورياً." />
+    <meta property="og:image" content="/hero.webp" />
+    <meta property="og:locale" content="ar_AR" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CAR-SILA — التواصل الذكي للسيارات" />
+    <meta name="twitter:description" content="Smart communication between drivers and car owners. No phone numbers. No trackers." />
+    <meta name="twitter:image" content="/hero.webp" />
+    <link rel="canonical" href="/" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "CAR-SILA",
+        "alternateName": "كار سيلا",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Web",
+        "inLanguage": ["ar", "en"],
+        "description": "تواصل ذكي بين السائقين وأصحاب السيارات عبر رمز QR بدون كشف رقم الهاتف.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
         }
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-    <style>
-      * { font-family: 'Tajawal', sans-serif; }
-      html, body { max-width: 100%; overflow-x: hidden; }
-    </style>
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
-    <div id="root"></div>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white" style="background:#020617;color:#e2e8f0;margin:0;font-family:Tajawal,sans-serif;">
+    <div id="root">
+      <main style="max-width:44rem;margin:0 auto;padding:2rem 1.25rem;line-height:1.7;">
+        <h1>سيارتك. هويتك. خصوصيتك.</h1>
+        <p>تواصل ذكي وفوري بين السائقين وأصحاب السيارات. بدون أرقام هواتف. بدون أجهزة تتبع. خصوصية تامة فقط.</p>
+        <p lang="en">Your Car. Your Identity. Your Privacy. Smart communication between drivers and car owners. No phone numbers. No trackers. Just privacy.</p>
+        <p><a href="/">ابدأ الآن</a> · <a href="#how-it-works">كيف يعمل</a></p>
+        <img src="/hero.webp" width="1280" height="853" alt="سيارة فاخرة — ملصق CAR-SILA للتواصل الخاص" />
+
+        <h2>المميزات</h2>
+        <h3>إشعارات فورية</h3>
+        <p>استقبل تنبيهات مباشرة حول سيارتك لحظة حدوثها.</p>
+        <h3>تواصل مجهول وآمن</h3>
+        <p>تحدث بأمان وسرية تامة دون كشف رقم هاتفك أو هويتك.</p>
+        <h3>بلاغات ذكية وسريعة</h3>
+        <p>أرسل واستقبل بلاغات مخصصة بضغطة زر واحدة.</p>
+        <h3>الخصوصية أولاً</h3>
+        <p>حماية بياناتك وخصوصيتك هي أولويتنا المطلقة.</p>
+
+        <h2 id="how-it-works">كيف يعمل</h2>
+        <p>خطوات بسيطة لتجربة تواصل ذكية وآمنة</p>
+        <ol>
+          <li><strong>سجل سيارتك</strong> — أنشئ حسابك وأضف تفاصيل سيارتك بسهولة.</li>
+          <li><strong>توليد كود QR</strong> — احصل على رمز QR فريد ومحمي لسيارتك.</li>
+          <li><strong>ثبته على سيارتك</strong> — اطبعه والصقه على زجاج السيارة أو الهيكل.</li>
+          <li><strong>استقبل وتجاوب</strong> — استلم التنبيهات وتواصل بشكل مجهول وفوري.</li>
+        </ol>
+
+        <h2>الأسئلة الشائعة</h2>
+        <h3>كيف يحمي CAR-SILA رقم هاتفي وخصوصيتي؟</h3>
+        <p>عندما يقوم أي شخص بمسح ملصق الـ QR الموجود على سيارتك، يفتح له نظام دردشة وإشعارات ذكي ومشفر. لا يرى الماسح رقم هاتفك أو اسمك الحقيقي.</p>
+        <h3>هل يحتاج الشخص الذي يمسح الـ QR إلى تثبيت أي تطبيق؟</h3>
+        <p>لا. أي شخص يمسح الرمز بكاميرا الهاتف العادية ويفتح الموقع فوراً بدون تسجيل وبدون تطبيق.</p>
+        <h3>ما هي أنواع البلاغات التي يمكن إرسالها؟</h3>
+        <p>بلاغات جاهزة مثل السيارة تغلق الطريق، الأنوار مضاءة، نافذة مفتوحة، حادث بسيط، بالإضافة لرسالة وصورة.</p>
+        <h3>كيف أحصل على ملصق الـ QR لسيارتي؟</h3>
+        <p>بعد تسجيل الحساب وإضافة السيارة يمكنك تنزيل الرمز للطباعة أو طلب ملصق جاهز.</p>
+        <h3>هل يمكنني إضافة أكثر من سيارة في حساب واحد؟</h3>
+        <p>نعم. يمكنك إدارة عدة سيارات من لوحة تحكم واحدة، لكل سيارة رمز QR مستقل.</p>
+
+        <h2>تواصل معنا</h2>
+        <p>غزة، فلسطين · <a href="mailto:neamahamad2003@gmail.com">neamahamad2003@gmail.com</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

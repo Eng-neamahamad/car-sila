@@ -106,8 +106,12 @@ export const LandingPage: React.FC = () => {
         {/* Dark Ambient Background with Sleek Dark Sedan Rear View */}
         <div className="absolute inset-x-0 top-0 z-0 h-80 overflow-hidden select-none pointer-events-none sm:inset-0 sm:h-auto">
           <img
-            src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=2000&auto=format&fit=crop&q=85"
+            src="/hero.webp"
             alt="Dark Luxury Car Rear"
+            width={1280}
+            height={853}
+            fetchPriority="high"
+            decoding="async"
             className="h-full w-full object-cover object-[28%_center] sm:object-right-bottom sm:scale-105 lg:object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/25 via-transparent to-slate-950/30 sm:from-slate-950/80 sm:via-slate-950/35 sm:to-transparent"></div>

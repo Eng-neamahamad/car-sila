@@ -20,6 +20,7 @@ import {
   isAdminView,
   isAppView,
   isOwnerView,
+  needsLiveBootstrap,
   readSavedView,
   VIEW_KEY
 } from '../data/storage';
@@ -249,6 +250,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.title = language === 'ar'
+      ? 'CAR-SILA — التواصل الذكي للسيارات'
+      : 'CAR-SILA — Smart Vehicle Communication';
   }, [language]);
 
   useEffect(() => {
@@ -473,19 +477,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.removeItem('carsila_session');
     localStorage.removeItem('carsila_auth_user');
     let stopped = false;
-    const load = () => {
+    const load = (force = false) => {
+      if (!force && document.visibilityState === 'hidden') return;
       api<Workspace>('/api/bootstrap')
         .then((data) => {
           if (!stopped) applyWorkspace(data);
         })
         .catch(() => undefined);
     };
-    load();
+    load(true);
+    if (!needsLiveBootstrap(currentView)) {
+      return () => {
+        stopped = true;
+      };
+    }
     const liveChat = currentView === 'messages' || currentView === 'qr-scan-flow';
-    const timer = window.setInterval(load, liveChat ? 4000 : 6000);
+    const timer = window.setInterval(() => load(), liveChat ? 4000 : 6000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [currentView]);
 

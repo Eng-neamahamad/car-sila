@@ -27,8 +27,8 @@ export default defineConfig(() => {
       headers: {
         'Content-Security-Policy': [
           "default-src 'self'",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://accounts.google.com",
-          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com",
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com data:",
           "img-src 'self' data: blob: https://images.unsplash.com",
           "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com",
