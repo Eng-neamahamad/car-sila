@@ -22,7 +22,7 @@ export const LandingPage: React.FC = () => {
     status: 'active' as const,
     scansCount: 1,
     reportsCount: 0,
-    imageUrl: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/demo-car.webp',
     createdAt: '2026-01-01'
   };
 

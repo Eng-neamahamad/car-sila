@@ -217,7 +217,7 @@ export const AdminOverviewView: React.FC = () => {
     <div className="space-y-5 text-start text-white">
       <section className="relative min-h-[168px] overflow-hidden rounded-3xl border border-cyan-400/25 bg-gradient-to-r from-[#042028] via-[#063040] to-[#041820]">
         <img
-          src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=80"
+          src="/hero.webp"
           alt=""
           className="pointer-events-none absolute inset-y-0 end-0 h-full w-[42%] object-cover object-center [mask-image:linear-gradient(to_left,black_55%,transparent)] rtl:[mask-image:linear-gradient(to_right,black_55%,transparent)]"
         />

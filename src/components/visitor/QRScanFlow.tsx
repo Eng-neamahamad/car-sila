@@ -120,7 +120,7 @@ export const QRScanFlow: React.FC = () => {
       hint: t('visitorBlockingHint'),
       icon: <Car className="h-5 w-5" />,
       tone: 'border-cyan-400/40 text-cyan-300 bg-cyan-500/10',
-      image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=900&q=70',
+      image: '/scan-blocking.webp',
       iconClass: 'bg-cyan-500 text-white',
       borderClass: 'border-cyan-400/60 shadow-cyan-500/10',
     },
@@ -130,7 +130,7 @@ export const QRScanFlow: React.FC = () => {
       hint: t('visitorLightsHint'),
       icon: <Lightbulb className="h-5 w-5" />,
       tone: 'border-amber-400/40 text-amber-300 bg-amber-500/10',
-      image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=70',
+      image: '/scan-lights.webp',
       iconClass: 'bg-amber-500 text-white',
       borderClass: 'border-amber-400/60 shadow-amber-500/10',
     },
@@ -140,7 +140,7 @@ export const QRScanFlow: React.FC = () => {
       hint: t('visitorAccidentHint'),
       icon: <TriangleAlert className="h-5 w-5" />,
       tone: 'border-rose-400/40 text-rose-300 bg-rose-500/10',
-      image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=900&q=70',
+      image: '/hero.webp',
       iconClass: 'bg-rose-500 text-white',
       borderClass: 'border-rose-400/60 shadow-rose-500/10',
     },
@@ -150,7 +150,7 @@ export const QRScanFlow: React.FC = () => {
       hint: t('visitorOtherHint'),
       icon: <Package className="h-5 w-5" />,
       tone: 'border-sky-400/40 text-sky-300 bg-sky-500/10',
-      image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=70',
+      image: '/scan-other.webp',
       iconClass: 'bg-sky-500 text-white',
       borderClass: 'border-sky-400/60 shadow-sky-500/10',
     },
@@ -390,7 +390,7 @@ export const QRScanFlow: React.FC = () => {
             <div className="grid items-center gap-3 sm:gap-6 lg:grid-cols-[1.15fr_1fr_auto]">
               <div className="relative h-32 overflow-hidden rounded-2xl border border-cyan-400/25 sm:h-52 sm:rounded-[2rem]">
                 <img
-                  src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80"
+                  src="/hero.webp"
                   alt=""
                   className="h-full w-full object-cover"
                 />

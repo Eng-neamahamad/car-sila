@@ -426,7 +426,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
         {/* RIGHT COLUMN: LUXURY VEHICLE VISUAL */}
         <div className="hidden lg:flex lg:col-span-6 relative bg-slate-950 items-center justify-center p-8 overflow-hidden">
           <img
-            src="https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=1200&auto=format&fit=crop&q=80"
+            src="/demo-car.webp"
             alt="Luxury Car Taillights"
             className="absolute inset-0 w-full h-full object-cover opacity-80 filter brightness-90"
           />
